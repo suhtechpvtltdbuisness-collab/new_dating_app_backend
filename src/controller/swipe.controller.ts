@@ -79,12 +79,13 @@ export async function getDislikesHandler(
 }
 
 export async function getIncomingLikesHandler(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const data = await getIncomingLikes(requireUserId(res));
+    const filter = String(req.query.filter ?? "all");
+    const data = await getIncomingLikes(requireUserId(res), filter);
     res.status(200).json({ data });
   } catch (error) {
     next(error);

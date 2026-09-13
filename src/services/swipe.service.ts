@@ -105,10 +105,54 @@ export async function getDislikes(userId: string) {
   );
 }
 
+function distanceKm(
+  from: { coordinates?: number[] } | null | undefined,
+  to: { coordinates?: number[] } | null | undefined,
+): number | null {
+  const a = from?.coordinates;
+  const b = to?.coordinates;
+  if (!a || !b || a.length < 2 || b.length < 2) return null;
+  const [lng1, lat1] = a.map(Number);
+  const [lng2, lat2] = b.map(Number);
+  if (![lng1, lat1, lng2, lat2].every(Number.isFinite)) return null;
+  if ((lat1 === 0 && lng1 === 0) || (lat2 === 0 && lng2 === 0)) return null;
+
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)) * 10) / 10;
+}
+
+function matchScore(current: any, other: any, km: number | null): number {
+  const mine = new Set(
+    (current?.interests ?? []).map((item: string) => item.toLowerCase()),
+  );
+  const theirs = (other?.interests ?? []) as string[];
+  const shared = theirs.filter((item) => mine.has(String(item).toLowerCase())).length;
+  let score = 40;
+  if (mine.size && theirs.length) {
+    score += Math.round((shared / Math.max(theirs.length, 1)) * 35);
+  }
+  if (
+    current?.city &&
+    other?.city &&
+    String(current.city).toLowerCase() === String(other.city).toLowerCase()
+  ) {
+    score += 15;
+  }
+  if (km != null && km <= 25) score += 10;
+  if (Array.isArray(other?.photos) && other.photos.length > 0) score += 5;
+  return Math.min(99, score);
+}
+
 /// Users who liked the current user but have not been swiped back yet
 /// (powers the "Liked you" tab).
-export async function getIncomingLikes(userId: string) {
+export async function getIncomingLikes(userId: string, filter = "all") {
   const validatedUserId = validateObjectId(userId, "userId");
+  const me = await UserModel.findById(validatedUserId).lean();
 
   const [incoming, outgoing] = await Promise.all([
     SwipeModel.find({ targetUserId: validatedUserId, action: "like" })
@@ -120,16 +164,44 @@ export async function getIncomingLikes(userId: string) {
   const swipedBack = new Set(
     outgoing.map((swipe) => swipe.targetUserId.toString()),
   );
+  const freshAfter = Date.now() - 48 * 60 * 60 * 1000;
 
-  return Promise.all(
-    incoming
-      .filter((like) => !swipedBack.has(like.swiperId.toString()))
-      .map(async (like) => ({
-        ...presentUser(await resolveUserSummary(like.swiperId.toString())),
-        swipeId: String(like._id),
-        likedAt: like.createdAt,
-      })),
+  const likes = (
+    await Promise.all(
+      incoming
+        .filter((like) => !swipedBack.has(like.swiperId.toString()))
+        .map(async (like) => {
+          const user = await UserModel.findById(like.swiperId).lean();
+          if (!user || user.active === false) return null;
+          const likedAt = like.createdAt ? new Date(like.createdAt) : null;
+          const km = distanceKm(me?.location, user.location);
+          return {
+            ...presentUser(user),
+            swipeId: String(like._id),
+            likedAt,
+            distanceKm: km,
+            matchScore: matchScore(me, user, km),
+            isNew: Boolean(likedAt && likedAt.getTime() >= freshAfter),
+          };
+        }),
+    )
+  ).filter((item): item is NonNullable<typeof item> => item != null);
+
+  const nearby = likes.filter(
+    (item) => item.distanceKm != null && item.distanceKm <= 50,
   );
+  const newest = likes.filter((item) => item.isNew);
+  const selected =
+    filter === "new" ? newest : filter === "nearby" ? nearby : likes;
+
+  return {
+    likes: selected,
+    counts: {
+      all: likes.length,
+      new: newest.length,
+      nearby: nearby.length,
+    },
+  };
 }
 
 export async function getMatches(userId: string) {
