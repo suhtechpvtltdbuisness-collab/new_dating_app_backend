@@ -1,3 +1,6 @@
+import { env } from "../config/env";
+import { toViewablePhotoUrl } from "../services/media.service";
+
 const LOOKING_FOR = ["dating", "relationship", "friendship", "networking"];
 const GENDERS = ["male", "female", "other"];
 
@@ -19,12 +22,31 @@ function toId(value: unknown): string {
 
 function firstPhoto(user: any): string {
   return Array.isArray(user?.photos) && user.photos.length > 0
-    ? user.photos[0]
+    ? presentPhoto(user.photos[0])
     : "";
+}
+
+function apiBaseUrl(): string {
+  return (
+    env.publicBaseUrl ||
+    "https://dating-backend-rust.vercel.app"
+  ).replace(/\/$/, "");
+}
+
+function presentPhoto(url: string): string {
+  return toViewablePhotoUrl(url, apiBaseUrl());
+}
+
+function presentPhotos(photos: unknown): string[] {
+  if (!Array.isArray(photos)) return [];
+  return photos
+    .map((item) => presentPhoto(String(item)))
+    .filter((item) => item.length > 0);
 }
 
 export function presentUser(user: any) {
   if (!user) return null;
+  const photos = presentPhotos(user.photos);
   return {
     id: toId(user._id),
     _id: toId(user._id),
@@ -36,12 +58,31 @@ export function presentUser(user: any) {
     gender: normalizeGender(user.gender),
     interestedIn: user.interestedIn ?? "",
     profile: user.profile ?? "",
-    photos: user.photos ?? [],
-    photoUrls: user.photos ?? [],
+    photos,
+    photoUrls: photos,
     bio: user.bio ?? user.profile ?? "",
     interests: user.interests ?? [],
     city: user.city,
     country: user.country,
+    hometown: user.hometown ?? "",
+    work: user.work ?? "",
+    education: user.education ?? "",
+    educationLevel: user.educationLevel ?? "",
+    height: user.height ?? "",
+    exercise: user.exercise ?? "",
+    starSign: user.starSign ?? "",
+    drinking: user.drinking ?? "",
+    smoking: user.smoking ?? "",
+    lookingFor: user.lookingFor ?? "",
+    kids: user.kids ?? "",
+    haveKids: user.haveKids ?? "",
+    religion: user.religion ?? "",
+    politics: user.politics ?? "",
+    pronouns: user.pronouns ?? "",
+    languages: user.languages ?? [],
+    courses: user.courses ?? [],
+    qualities: user.qualities ?? [],
+    openingMoves: user.openingMoves ?? [],
     relationshipStatus: user.relationshipStatus ?? "single",
     location: user.location,
     isVerified: Boolean(user.isVerified),

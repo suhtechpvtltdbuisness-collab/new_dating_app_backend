@@ -36,6 +36,11 @@ export const env = {
   refreshTtl: process.env.REFRESH_TOKEN_TTL ?? "30d",
   otpTtlMinutes: Number(process.env.OTP_TTL_MINUTES ?? 5),
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:3000",
+  publicBaseUrl: (
+    process.env.PUBLIC_BASE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
+  ).replace(/\/$/, ""),
+  blobReadWriteToken: process.env.BLOB_READ_WRITE_TOKEN ?? "",
   mail: {
     host: required("SMTP_HOST"),
     port: Number(process.env.SMTP_PORT ?? 587),

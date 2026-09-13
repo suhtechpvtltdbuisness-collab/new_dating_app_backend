@@ -8,11 +8,54 @@ const STRING_FIELDS = [
   "bio",
   "city",
   "country",
+  "hometown",
+  "work",
+  "education",
+  "educationLevel",
+  "height",
+  "exercise",
+  "starSign",
+  "drinking",
+  "smoking",
+  "lookingFor",
+  "kids",
+  "haveKids",
+  "religion",
+  "politics",
+  "pronouns",
   "relationshipStatus",
 ] as const;
 
+const OPTIONAL_STRING_FIELDS = [
+  "bio",
+  "city",
+  "country",
+  "hometown",
+  "work",
+  "education",
+  "educationLevel",
+  "height",
+  "exercise",
+  "starSign",
+  "drinking",
+  "smoking",
+  "lookingFor",
+  "kids",
+  "haveKids",
+  "religion",
+  "politics",
+  "pronouns",
+] as const;
+
 const BOOLEAN_FIELDS = ["active", "isOnline"] as const;
-const STRING_LIST_FIELDS = ["interests", "photos"] as const;
+const STRING_LIST_FIELDS = [
+  "interests",
+  "photos",
+  "languages",
+  "courses",
+  "qualities",
+  "openingMoves",
+] as const;
 
 export type UpdateProfileInput = Record<string, unknown>;
 
@@ -38,10 +81,17 @@ export function validateUpdateProfileInput(
   for (const field of STRING_FIELDS) {
     const value = payload[field];
     if (value === undefined) continue;
-    if (typeof value !== "string" || !value.trim()) {
+    if (typeof value !== "string") {
+      throw new AuthError(`${field} must be a string`, 400);
+    }
+    const trimmed = value.trim();
+    const optional = (OPTIONAL_STRING_FIELDS as readonly string[]).includes(
+      field,
+    );
+    if (!trimmed && !optional) {
       throw new AuthError(`${field} must be a non-empty string`, 400);
     }
-    updates[field] = value.trim();
+    updates[field] = trimmed;
   }
 
   for (const field of BOOLEAN_FIELDS) {

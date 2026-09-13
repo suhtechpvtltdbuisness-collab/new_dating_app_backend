@@ -1,6 +1,7 @@
 import { AuthError } from "../errors/AuthError";
 import { UserModel } from "../models/User";
 import { presentPreferences, presentUser } from "../presenters";
+import { deleteBlobIfPresent, extractBlobPathname } from "./media.service";
 import { validateObjectId } from "../validation/chat.validation";
 import {
   validateUpdatePreferencesInput,
@@ -69,7 +70,11 @@ export async function addUserPhotos(userId: string, photoUrls: string[]) {
   user.photos = [...(user.photos ?? []), ...photoUrls];
   await user.save();
 
-  return { photoUrls: user.photos, photos: user.photos };
+  const presented = presentUser(user);
+  return {
+    photoUrls: presented?.photoUrls ?? user.photos,
+    photos: presented?.photos ?? user.photos,
+  };
 }
 
 export async function removeUserPhoto(userId: string, photoRef: string) {
@@ -79,18 +84,30 @@ export async function removeUserPhoto(userId: string, photoRef: string) {
   }
 
   const user = await requireUser(userId);
-  const remaining = (user.photos ?? []).filter(
-    (url) => url !== reference && !url.endsWith(`/${reference}`),
-  );
+  const refPath = extractBlobPathname(reference);
+  const remaining = (user.photos ?? []).filter((url) => {
+    if (url === reference || url.endsWith(`/${reference}`)) return false;
+    if (refPath && extractBlobPathname(url) === refPath) return false;
+    return true;
+  });
 
   if (remaining.length === (user.photos ?? []).length) {
     throw new AuthError("Photo not found", 404);
   }
 
+  const removed = (user.photos ?? []).find((url) => !remaining.includes(url));
+  if (removed) {
+    await deleteBlobIfPresent(removed);
+  }
+
   user.photos = remaining;
   await user.save();
 
-  return { photoUrls: user.photos, photos: user.photos };
+  const presented = presentUser(user);
+  return {
+    photoUrls: presented?.photoUrls ?? user.photos,
+    photos: presented?.photos ?? user.photos,
+  };
 }
 
 export async function getUserPreferences(userId: string) {
