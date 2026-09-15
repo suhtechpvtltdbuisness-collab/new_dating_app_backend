@@ -22,9 +22,31 @@ import userRouter from "./routes/user.routes";
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+
+const allowedOrigins = [
+  env.clientOrigin,
+  "http://localhost:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Mobile / Flutter clients often send no Origin header.
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+    credentials: true,
+  }),
+);
+
 app.use(morgan("dev"));
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
 function getDbStatus(): string {

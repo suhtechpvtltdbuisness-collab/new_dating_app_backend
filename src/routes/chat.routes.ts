@@ -10,6 +10,7 @@ import {
   listChatsHandler,
   listMessagesHandler,
   markChatReadHandler,
+  realtimeConfigHandler,
   reportMessageHandler,
   sendMessageHandler,
   typingIndicatorHandler,
@@ -23,6 +24,7 @@ chatRouter.use(authenticateAccessToken);
 
 chatRouter.get("/", listChatsHandler);
 chatRouter.post("/", createChatHandler);
+chatRouter.get("/realtime-config", realtimeConfigHandler);
 chatRouter.post("/messages/report", reportMessageHandler);
 chatRouter.get("/recipient/:recipientId", getChatsByRecipientHandler);
 chatRouter.get("/:chatId/messages", listMessagesHandler);

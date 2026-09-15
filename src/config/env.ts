@@ -41,6 +41,9 @@ export const env = {
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
   ).replace(/\/$/, ""),
   blobReadWriteToken: process.env.BLOB_READ_WRITE_TOKEN ?? "",
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   mail: {
     host: required("SMTP_HOST"),
     port: Number(process.env.SMTP_PORT ?? 587),

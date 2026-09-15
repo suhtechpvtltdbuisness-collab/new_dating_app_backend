@@ -10,10 +10,12 @@ import {
   listConversationMessages,
   listConversations,
   markConversationRead,
+  notifyTyping,
   reportConversationMessage,
   sendConversationMessage,
   updateConversation,
 } from "../services/conversation.service";
+import { realtimePublicConfig } from "../services/realtime.service";
 import { storeUploads } from "../services/media.service";
 import { numericQuery, param, requireUserId } from "../utils/context";
 
@@ -107,13 +109,13 @@ export async function listMessagesHandler(
 ): Promise<void> {
   try {
     const userId = requireUserId(res);
-    const messages = await listConversationMessages(
+    const result = await listConversationMessages(
       userId,
       param(req, "chatId"),
       numericQuery(req, "page") ?? 1,
       numericQuery(req, "limit") ?? 50,
     );
-    res.status(200).json({ data: { messages } });
+    res.status(200).json({ data: result });
   } catch (error) {
     next(error);
   }
@@ -189,13 +191,27 @@ export async function uploadChatMediaHandler(
 }
 
 export async function typingIndicatorHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = requireUserId(res);
+    const result = await notifyTyping(userId, param(req, "chatId"));
+    res.status(202).json({ message: "Typing", data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function realtimeConfigHandler(
   _req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
     requireUserId(res);
-    res.status(202).json({ message: "Typing", data: { received: true } });
+    res.status(200).json({ data: realtimePublicConfig() });
   } catch (error) {
     next(error);
   }

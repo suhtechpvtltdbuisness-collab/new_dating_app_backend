@@ -6,13 +6,23 @@ import { ReportModel } from "../models/Report";
 import { UserModel } from "../models/User";
 import { presentConversation, presentMessage } from "../presenters";
 import { validateObjectId } from "../validation/chat.validation";
+import {
+  publishConversationMessage,
+  publishMessagesRead,
+  publishTyping,
+} from "./realtime.service";
 
 const DEFAULT_MESSAGE_LIMIT = 50;
+const MAX_MESSAGE_LENGTH = 2000;
 
 function clamp(value: unknown, fallback: number, max: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
   return Math.min(Math.floor(parsed), max);
+}
+
+export function makePairKey(userA: string, userB: string): string {
+  return [userA, userB].sort().join(":");
 }
 
 function otherParticipantId(
@@ -23,6 +33,10 @@ function otherParticipantId(
     (participant) => String(participant) !== userId,
   );
   return String(other ?? "");
+}
+
+function participantIds(conversation: { participants: unknown[] }): string[] {
+  return conversation.participants.map((participant) => String(participant));
 }
 
 async function requireConversation(userId: string, chatId: string) {
@@ -43,14 +57,19 @@ async function loadMessages(
   page: number,
   limit: number,
 ) {
-  const messages = await ChatModel.find({
+  const filter = {
     conversationId,
     deletedAt: { $exists: false },
-  })
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
+  };
+
+  const [messages, total] = await Promise.all([
+    ChatModel.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    ChatModel.countDocuments(filter),
+  ]);
 
   const senderIds = [...new Set(messages.map((item) => String(item.senderId)))];
   const senders = await UserModel.find({ _id: { $in: senderIds } })
@@ -58,11 +77,19 @@ async function loadMessages(
     .lean();
   const senderById = new Map(senders.map((user) => [String(user._id), user]));
 
-  return messages
+  const presented = messages
     .reverse()
     .map((message) =>
       presentMessage(message, senderById.get(String(message.senderId))),
     );
+
+  return {
+    messages: presented,
+    page,
+    limit,
+    total,
+    hasMore: page * limit < total,
+  };
 }
 
 export async function listConversations(
@@ -100,6 +127,27 @@ export async function listConversations(
   );
 }
 
+async function findDirectConversation(userA: string, userB: string) {
+  const pairKey = makePairKey(userA, userB);
+
+  let conversation = await ConversationModel.findOne({ pairKey });
+  if (conversation) return conversation;
+
+  conversation = await ConversationModel.findOne({
+    participants: { $all: [userA, userB], $size: 2 },
+  });
+
+  if (conversation && !(conversation as { pairKey?: string }).pairKey) {
+    await ConversationModel.updateOne(
+      { _id: conversation._id },
+      { $set: { pairKey, type: "direct" } },
+    );
+    conversation.pairKey = pairKey;
+  }
+
+  return conversation;
+}
+
 export async function createConversation(
   userId: string,
   payload: { recipientId?: string; message?: string },
@@ -122,24 +170,39 @@ export async function createConversation(
     throw new AuthError("You cannot message this user", 403);
   }
 
-  const existing = await ConversationModel.findOne({
-    participants: { $all: [validUserId, recipientId], $size: 2 },
-  });
+  const pairKey = makePairKey(validUserId, recipientId);
+  let conversation = await findDirectConversation(validUserId, recipientId);
 
-  const conversation =
-    existing ??
-    (await ConversationModel.create({
-      participants: [validUserId, recipientId],
-      lastMessage: "",
-      lastMessageAt: new Date(),
-    }));
-
-  if (existing) {
-    await ConversationModel.updateOne(
-      { _id: conversation._id },
-      { $pull: { deletedFor: new Types.ObjectId(validUserId) } },
-    );
+  if (!conversation) {
+    try {
+      conversation = await ConversationModel.create({
+        pairKey,
+        type: "direct",
+        participants: [validUserId, recipientId],
+        lastMessage: "",
+        lastMessageAt: new Date(),
+      });
+    } catch (error: any) {
+      // Concurrent create — unique pairKey wins; reload the winner.
+      if (error?.code === 11000) {
+        conversation = await findDirectConversation(validUserId, recipientId);
+      } else {
+        throw error;
+      }
+    }
   }
+
+  if (!conversation) {
+    throw new AuthError("Unable to create conversation", 500);
+  }
+
+  await ConversationModel.updateOne(
+    { _id: conversation._id },
+    {
+      $pull: { deletedFor: new Types.ObjectId(validUserId) },
+      $set: { pairKey, type: "direct" },
+    },
+  );
 
   const message = payload?.message?.trim();
   if (message) {
@@ -147,17 +210,22 @@ export async function createConversation(
   }
 
   const refreshed = await ConversationModel.findById(conversation._id).lean();
+  const messagePage = await loadMessages(
+    conversation._id,
+    1,
+    DEFAULT_MESSAGE_LIMIT,
+  );
 
   return presentConversation(
     refreshed ?? conversation.toObject(),
     validUserId,
     recipient,
-    await loadMessages(conversation._id, 1, DEFAULT_MESSAGE_LIMIT),
+    messagePage.messages,
   );
 }
 
 async function appendMessage(
-  conversation: { _id: Types.ObjectId; unread?: unknown },
+  conversation: { _id: Types.ObjectId; participants?: unknown[]; unread?: unknown },
   senderId: string,
   recipientId: string,
   payload: {
@@ -187,7 +255,23 @@ async function appendMessage(
     },
   );
 
-  return chat;
+  const sender = await UserModel.findById(senderId).select("name photos").lean();
+  const presented = presentMessage(chat.toObject(), sender);
+  const members =
+    conversation.participants && conversation.participants.length > 0
+      ? conversation.participants.map((participant) => String(participant))
+      : [senderId, recipientId];
+
+  void publishConversationMessage({
+    conversationId: String(conversation._id),
+    participantIds: members,
+    message: presented,
+    lastMessage: payload.message,
+    lastMessageAt: chat.createdAt,
+    recipientId,
+  });
+
+  return { chat, presented };
 }
 
 export async function getConversation(
@@ -200,7 +284,7 @@ export async function getConversation(
   const conversation = await requireConversation(validUserId, chatId);
   const otherId = otherParticipantId(conversation, validUserId);
 
-  const [otherUser, messages] = await Promise.all([
+  const [otherUser, messagePage] = await Promise.all([
     UserModel.findById(otherId).select("name photos isOnline lastActive").lean(),
     loadMessages(
       conversation._id,
@@ -213,7 +297,7 @@ export async function getConversation(
     conversation.toObject(),
     validUserId,
     otherUser,
-    messages,
+    messagePage.messages,
   );
 }
 
@@ -225,12 +309,10 @@ export async function listConversationMessages(
 ) {
   const validUserId = validateObjectId(userId, "userId");
   const conversation = await requireConversation(validUserId, chatId);
+  const safePage = clamp(page, 1, 1000);
+  const safeLimit = clamp(limit, DEFAULT_MESSAGE_LIMIT, 200);
 
-  return loadMessages(
-    conversation._id,
-    clamp(page, 1, 1000),
-    clamp(limit, DEFAULT_MESSAGE_LIMIT, 200),
-  );
+  return loadMessages(conversation._id, safePage, safeLimit);
 }
 
 export async function sendConversationMessage(
@@ -250,22 +332,30 @@ export async function sendConversationMessage(
     throw new AuthError("message is required", 400);
   }
 
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    throw new AuthError(
+      `message must be at most ${MAX_MESSAGE_LENGTH} characters`,
+      400,
+    );
+  }
+
   if ((conversation.blockedBy ?? []).length > 0) {
     throw new AuthError("This conversation is blocked", 403);
   }
 
   const recipientId = otherParticipantId(conversation, validUserId);
-  const chat = await appendMessage(conversation, validUserId, recipientId, {
-    message,
-    attachmentUrl: payload.attachmentUrl,
-    attachmentType: payload.attachmentType,
-  });
+  const { presented } = await appendMessage(
+    conversation,
+    validUserId,
+    recipientId,
+    {
+      message,
+      attachmentUrl: payload.attachmentUrl,
+      attachmentType: payload.attachmentType,
+    },
+  );
 
-  const sender = await UserModel.findById(validUserId)
-    .select("name photos")
-    .lean();
-
-  return presentMessage(chat.toObject(), sender);
+  return presented;
 }
 
 export async function markConversationRead(userId: string, chatId: string) {
@@ -287,7 +377,25 @@ export async function markConversationRead(userId: string, chatId: string) {
     ),
   ]);
 
+  void publishMessagesRead({
+    conversationId: String(conversation._id),
+    userId: validUserId,
+    participantIds: participantIds(conversation),
+  });
+
   return { chatId: String(conversation._id), unreadCount: 0 };
+}
+
+export async function notifyTyping(userId: string, chatId: string) {
+  const validUserId = validateObjectId(userId, "userId");
+  const conversation = await requireConversation(validUserId, chatId);
+
+  void publishTyping({
+    conversationId: String(conversation._id),
+    userId: validUserId,
+  });
+
+  return { received: true, conversationId: String(conversation._id) };
 }
 
 export async function updateConversation(
@@ -395,9 +503,7 @@ export async function getConversationsWith(
   const validUserId = validateObjectId(userId, "userId");
   const validOtherId = validateObjectId(otherUserId, "userId");
 
-  const conversation = await ConversationModel.findOne({
-    participants: { $all: [validUserId, validOtherId], $size: 2 },
-  }).lean();
+  const conversation = await findDirectConversation(validUserId, validOtherId);
 
   if (!conversation) {
     return [];
@@ -407,13 +513,16 @@ export async function getConversationsWith(
     .select("name photos isOnline lastActive")
     .lean();
 
+  const lean = conversation.toObject ? conversation.toObject() : conversation;
+
   return [
     presentConversation(
-      conversation,
+      lean,
       validUserId,
       otherUser,
       withMessages
-        ? await loadMessages(conversation._id, 1, DEFAULT_MESSAGE_LIMIT)
+        ? (await loadMessages(conversation._id, 1, DEFAULT_MESSAGE_LIMIT))
+            .messages
         : [],
     ),
   ];

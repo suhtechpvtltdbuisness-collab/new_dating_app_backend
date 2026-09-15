@@ -2,6 +2,15 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 const conversationSchema = new Schema(
   {
+    // Sorted "userA:userB" — enforces one direct conversation per pair.
+    pairKey: { type: String, unique: true, sparse: true, index: true },
+    // "direct" now; "group" can be added later without rewriting the schema.
+    type: {
+      type: String,
+      enum: ["direct", "group"],
+      default: "direct",
+      index: true,
+    },
     participants: [
       { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     ],
