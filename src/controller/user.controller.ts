@@ -49,7 +49,10 @@ export async function googleLoginHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const result = await loginWithGoogle(req.body?.idToken);
+    const result = await loginWithGoogle(
+      req.body?.idToken,
+      req.body?.accessToken,
+    );
     res.status(200).json({ message: "Google sign-in successful", data: result });
   } catch (error) {
     next(error);

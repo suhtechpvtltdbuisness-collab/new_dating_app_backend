@@ -38,6 +38,7 @@ import { generateOtp } from "../utils/otp";
 import { sendOtpMail } from "../utils/mail";
 import {
   signGoogleSignupToken,
+  verifyGoogleAccessToken,
   verifyGoogleIdToken,
   verifyGoogleSignupToken,
 } from "../utils/google";
@@ -151,12 +152,14 @@ export async function loginWithEmail(payload: LoginInput) {
   return { userId: user._id.toString(), email: user.email, ...tokens };
 }
 
-export async function loginWithGoogle(idToken?: string) {
-  if (!idToken) {
-    throw new AuthError("idToken is required", 400);
+export async function loginWithGoogle(idToken?: string, accessToken?: string) {
+  if (!idToken && !accessToken) {
+    throw new AuthError("idToken or accessToken is required", 400);
   }
 
-  const profile = await verifyGoogleIdToken(idToken);
+  const profile = idToken
+    ? await verifyGoogleIdToken(idToken)
+    : await verifyGoogleAccessToken(accessToken!);
   const user =
     (await findUserByGoogleId(profile.googleId)) ??
     (await findUserByEmail(profile.email));
