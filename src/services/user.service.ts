@@ -9,6 +9,7 @@ import {
   findRefreshToken,
   findValidEmailOtp,
   findUserByEmail,
+  findUserByGoogleId,
   findUserByPhone,
   findValidOtp,
   revokeRefreshToken,
@@ -35,6 +36,11 @@ import {
 } from "../validation/user.validation";
 import { generateOtp } from "../utils/otp";
 import { sendOtpMail } from "../utils/mail";
+import {
+  signGoogleSignupToken,
+  verifyGoogleIdToken,
+  verifyGoogleSignupToken,
+} from "../utils/google";
 
 function resolveIp(rawIp?: string, fallback?: string): string {
   const candidate = rawIp?.trim() || fallback?.trim() || "0.0.0.0";
@@ -75,13 +81,20 @@ export async function registerWithEmail(
   requestIp?: string,
 ) {
   const input = validateRegisterInput(payload);
+  const google = input.googleSignupToken
+    ? verifyGoogleSignupToken(input.googleSignupToken)
+    : null;
+  if (google) {
+    input.email = google.email;
+  }
 
-  const [existingEmail, existingPhone] = await Promise.all([
+  const [existingEmail, existingPhone, existingGoogle] = await Promise.all([
     findUserByEmail(input.email),
     findUserByPhone(input.phoneNumber),
+    google ? findUserByGoogleId(google.googleId) : null,
   ]);
 
-  if (existingEmail) {
+  if (existingEmail || existingGoogle) {
     throw new AuthError("Email already exists", 409);
   }
 
@@ -89,7 +102,9 @@ export async function registerWithEmail(
     throw new AuthError("Phone number already exists", 409);
   }
 
-  const passwordHash = await bcrypt.hash(input.password, 10);
+  const passwordHash = input.password
+    ? await bcrypt.hash(input.password, 10)
+    : undefined;
 
   const user = await createUser({
     phoneNumber: input.phoneNumber,
@@ -106,6 +121,8 @@ export async function registerWithEmail(
     ipAddress: resolveIp(input.ipAddress, requestIp),
     email: input.email,
     password: passwordHash,
+    googleId: google?.googleId,
+    authProvider: google ? "google" : "email",
   });
 
   const tokens = await issueTokens(user._id.toString(), user.phoneNumber);
@@ -132,6 +149,41 @@ export async function loginWithEmail(payload: LoginInput) {
 
   const tokens = await issueTokens(user._id.toString(), user.phoneNumber);
   return { userId: user._id.toString(), email: user.email, ...tokens };
+}
+
+export async function loginWithGoogle(idToken?: string) {
+  if (!idToken) {
+    throw new AuthError("idToken is required", 400);
+  }
+
+  const profile = await verifyGoogleIdToken(idToken);
+  const user =
+    (await findUserByGoogleId(profile.googleId)) ??
+    (await findUserByEmail(profile.email));
+
+  if (!user) {
+    return {
+      isNewUser: true,
+      email: profile.email,
+      name: profile.name,
+      signupToken: signGoogleSignupToken(profile),
+    };
+  }
+
+  if (!user.googleId) {
+    await UserModel.updateOne(
+      { _id: user._id },
+      { $set: { googleId: profile.googleId } },
+    );
+  }
+
+  const tokens = await issueTokens(user._id.toString(), user.phoneNumber);
+  return {
+    isNewUser: false,
+    userId: user._id.toString(),
+    email: user.email,
+    ...tokens,
+  };
 }
 
 export async function loginUser(payload: Partial<LoginRequestInput>) {

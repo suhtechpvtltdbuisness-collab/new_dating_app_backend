@@ -44,6 +44,10 @@ export const env = {
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  googleClientIds: (process.env.GOOGLE_CLIENT_ID ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
   mail: {
     host: required("SMTP_HOST"),
     port: Number(process.env.SMTP_PORT ?? 587),

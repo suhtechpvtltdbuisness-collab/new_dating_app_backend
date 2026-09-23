@@ -16,7 +16,8 @@ export interface RegisterInput {
   active?: boolean;
   ipAddress?: string;
   email: string;
-  password: string;
+  password?: string;
+  googleSignupToken?: string;
 }
 
 export interface LoginInput {
@@ -44,6 +45,7 @@ export function validateRegisterInput(
     location,
     email,
     password,
+    googleSignupToken,
   } = payload;
 
   const missingFields: string[] = [];
@@ -55,7 +57,7 @@ export function validateRegisterInput(
   if (!interestedIn?.trim()) missingFields.push("interestedIn");
   if (!profile?.trim()) missingFields.push("profile");
   if (!email?.trim()) missingFields.push("email");
-  if (!password) missingFields.push("password");
+  if (!password && !googleSignupToken) missingFields.push("password");
   if (!location?.coordinates) missingFields.push("location.coordinates");
 
   if (missingFields.length > 0) {
@@ -78,7 +80,7 @@ export function validateRegisterInput(
     throw new AuthError("Invalid email format", 400);
   }
 
-  if (password.length < 6) {
+  if (password && password.length < 6) {
     throw new AuthError("Password must be at least 6 characters", 400);
   }
 

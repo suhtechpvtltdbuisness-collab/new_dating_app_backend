@@ -18,7 +18,13 @@ export interface CreateUserInput {
   active: boolean;
   ipAddress: string;
   email: string;
-  password: string;
+  password?: string;
+  googleId?: string;
+  authProvider?: "email" | "google";
+}
+
+export function findUserByGoogleId(googleId: string) {
+  return UserModel.findOne({ googleId });
 }
 
 export function findUserByEmail(email: string) {

@@ -20,6 +20,7 @@ import {
   generateOtpHandler,
   getMeHandler,
   getSuggestionsHandler,
+  googleLoginHandler,
   loginUserHandler,
   logoutHandler,
   refreshTokenHandler,
@@ -37,6 +38,7 @@ userRouter.get("/otp/:number", generateOtpHandler);
 userRouter.post("/otp/validate", validateOtpHandler);
 userRouter.post("/register", registerUserHandler);
 userRouter.post("/login", loginUserHandler);
+userRouter.post("/google", googleLoginHandler);
 userRouter.post("/refresh", refreshTokenHandler);
 userRouter.post("/logout", logoutHandler);
 userRouter.post("/forgot-password", forgotPasswordHandler);
