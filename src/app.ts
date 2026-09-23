@@ -35,7 +35,11 @@ app.use(
   cors({
     origin(origin, callback) {
       // Mobile / Flutter clients often send no Origin header.
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
         callback(null, true);
         return;
       }
