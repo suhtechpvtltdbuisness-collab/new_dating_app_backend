@@ -7,7 +7,11 @@ type BroadcastMessage = {
 };
 
 function isConfigured(): boolean {
-  return Boolean(env.supabaseUrl && env.supabaseServiceRoleKey);
+  return Boolean(hasValidUrl() && env.supabaseServiceRoleKey);
+}
+
+function hasValidUrl(): boolean {
+  return /^https:\/\//.test(env.supabaseUrl);
 }
 
 async function broadcast(messages: BroadcastMessage[]): Promise<void> {
@@ -125,7 +129,7 @@ export async function publishMessagesRead(params: {
 }
 
 export function realtimePublicConfig() {
-  if (!env.supabaseUrl || !env.supabaseAnonKey) {
+  if (!hasValidUrl() || !env.supabaseAnonKey) {
     return { enabled: false as const };
   }
 
