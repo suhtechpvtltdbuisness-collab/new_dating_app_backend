@@ -22,11 +22,11 @@ function assertSelf(actorId: string, userId: string): void {
   }
 }
 
-export async function getUserById(userId: string) {
+export async function getUserById(userId: string, viewerId?: string) {
   const user = await UserModel.findById(
     validateObjectId(userId, "userId"),
   ).lean();
-  if (!user) {
+  if (!user || (user.isHidden && String(user._id) !== viewerId)) {
     throw new AuthError("User not found", 404);
   }
   return presentUser(user);

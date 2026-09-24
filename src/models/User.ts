@@ -96,6 +96,7 @@ const userSchema = new Schema(
       lastUpdated: { type: Date, default: Date.now },
     },
     active: { type: Boolean, default: true },
+    isHidden: { type: Boolean, default: false },
     ipAddress: { type: String, required: true },
   },
   { timestamps: true },

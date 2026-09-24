@@ -90,6 +90,7 @@ export function presentUser(user: any) {
     lastActive: user.lastActive ?? user.updatedAt,
     createdAt: user.createdAt,
     active: user.active !== false,
+    isHidden: Boolean(user.isHidden),
   };
 }
 

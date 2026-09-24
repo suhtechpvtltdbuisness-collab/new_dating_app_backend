@@ -42,7 +42,7 @@ export async function swipeUser(
   }
 
   const targetUser = await UserModel.findById(validatedTargetUserId).lean();
-  if (!targetUser) {
+  if (!targetUser || targetUser.isHidden) {
     throw new AuthError("Target user not found", 404);
   }
 
@@ -172,7 +172,7 @@ export async function getIncomingLikes(userId: string, filter = "all") {
         .filter((like) => !swipedBack.has(like.swiperId.toString()))
         .map(async (like) => {
           const user = await UserModel.findById(like.swiperId).lean();
-          if (!user || user.active === false) return null;
+          if (!user || user.active === false || user.isHidden) return null;
           const likedAt = like.createdAt ? new Date(like.createdAt) : null;
           const km = distanceKm(me?.location, user.location);
           return {

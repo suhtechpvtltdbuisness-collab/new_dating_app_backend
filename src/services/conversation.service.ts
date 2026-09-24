@@ -160,7 +160,7 @@ export async function createConversation(
   }
 
   const recipient = await UserModel.findById(recipientId)
-    .select("name photos isOnline lastActive blockedUsers")
+    .select("name photos isOnline lastActive blockedUsers isHidden")
     .lean();
   if (!recipient) {
     throw new AuthError("Recipient not found", 404);
@@ -172,6 +172,10 @@ export async function createConversation(
 
   const pairKey = makePairKey(validUserId, recipientId);
   let conversation = await findDirectConversation(validUserId, recipientId);
+
+  if (!conversation && recipient.isHidden) {
+    throw new AuthError("This user is not accepting new messages", 403);
+  }
 
   if (!conversation) {
     try {

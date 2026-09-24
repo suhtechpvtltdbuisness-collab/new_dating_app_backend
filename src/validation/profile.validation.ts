@@ -47,7 +47,7 @@ const OPTIONAL_STRING_FIELDS = [
   "pronouns",
 ] as const;
 
-const BOOLEAN_FIELDS = ["active", "isOnline"] as const;
+const BOOLEAN_FIELDS = ["active", "isOnline", "isHidden"] as const;
 const STRING_LIST_FIELDS = [
   "interests",
   "photos",

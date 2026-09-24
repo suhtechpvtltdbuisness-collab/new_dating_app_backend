@@ -67,6 +67,10 @@ export function validateRegisterInput(
     );
   }
 
+  if (Number.isNaN(new Date(dob).getTime())) {
+    throw new AuthError("Invalid date of birth", 400);
+  }
+
   const normalizedPhone = normalizePhoneNumber(phoneNumber);
   if (!isValidPhoneNumber(normalizedPhone)) {
     throw new AuthError(

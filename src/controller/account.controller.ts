@@ -20,8 +20,8 @@ export async function getUserHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    requireUserId(res);
-    const user = await getUserById(param(req, "id"));
+    const viewerId = requireUserId(res);
+    const user = await getUserById(param(req, "id"), viewerId);
     res.status(200).json({ data: user });
   } catch (error) {
     next(error);

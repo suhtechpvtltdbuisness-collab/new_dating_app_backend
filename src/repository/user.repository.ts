@@ -61,6 +61,7 @@ export function getSuggestedUsers(
     gender: { $in: candidateGenders },
     interestedIn: { $in: candidateInterestedIn },
     active: true,
+    isHidden: { $ne: true },
   })
     .limit(cap)
     .lean();
