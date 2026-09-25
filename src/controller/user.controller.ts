@@ -11,6 +11,7 @@ import {
   registerWithEmail,
   requestPasswordReset,
   resetPassword,
+  verifyPasswordResetOtp,
   validateEmailOtp,
   validateUserOtp,
 } from "../services/user.service";
@@ -185,6 +186,20 @@ export async function forgotPasswordHandler(
     const { email } = req.body as { email?: string };
     const result = await requestPasswordReset(email ?? "");
     res.status(200).json({ message: result.message, data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyResetOtpHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { email, otp } = req.body as { email?: string; otp?: string };
+    const result = await verifyPasswordResetOtp(email ?? "", otp);
+    res.status(200).json({ message: "OTP verified", data: result });
   } catch (error) {
     next(error);
   }

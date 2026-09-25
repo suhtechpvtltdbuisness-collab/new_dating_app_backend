@@ -329,6 +329,14 @@ export async function requestPasswordReset(email: string) {
   return { email: normalizedEmail, message: "Password reset OTP sent" };
 }
 
+export async function verifyPasswordResetOtp(email: string, otp?: string) {
+  const input = validateEmailOtpInput(email, otp);
+  if (!(await findValidEmailOtp(input.email, input.otp))) {
+    throw new AuthError("Invalid or expired OTP", 401);
+  }
+  return { email: input.email, valid: true };
+}
+
 export async function resetPassword(
   email: string,
   otp: string | undefined,
