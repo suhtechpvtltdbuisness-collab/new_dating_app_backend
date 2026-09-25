@@ -114,7 +114,7 @@ export async function listConversations(
     otherParticipantId(conversation, validUserId),
   );
   const users = await UserModel.find({ _id: { $in: otherIds } })
-    .select("name photos isOnline lastActive")
+    .select("name photos isOnline lastActive preferences.showOnline")
     .lean();
   const userById = new Map(users.map((user) => [String(user._id), user]));
 
@@ -160,7 +160,7 @@ export async function createConversation(
   }
 
   const recipient = await UserModel.findById(recipientId)
-    .select("name photos isOnline lastActive blockedUsers isHidden")
+    .select("name photos isOnline lastActive preferences.showOnline blockedUsers isHidden")
     .lean();
   if (!recipient) {
     throw new AuthError("Recipient not found", 404);
@@ -289,7 +289,7 @@ export async function getConversation(
   const otherId = otherParticipantId(conversation, validUserId);
 
   const [otherUser, messagePage] = await Promise.all([
-    UserModel.findById(otherId).select("name photos isOnline lastActive").lean(),
+    UserModel.findById(otherId).select("name photos isOnline lastActive preferences.showOnline").lean(),
     loadMessages(
       conversation._id,
       clamp(page, 1, 1000),
@@ -514,7 +514,7 @@ export async function getConversationsWith(
   }
 
   const otherUser = await UserModel.findById(validOtherId)
-    .select("name photos isOnline lastActive")
+    .select("name photos isOnline lastActive preferences.showOnline")
     .lean();
 
   const lean = conversation.toObject ? conversation.toObject() : conversation;

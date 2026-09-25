@@ -242,6 +242,9 @@ export async function validateUserOtp(number: string, otp?: string) {
 
 export async function generateEmailOtp(email: string) {
   const normalizedEmail = validateOtpEmail(email);
+  if (await findUserByEmail(normalizedEmail)) {
+    throw new AuthError("Email already exists", 409);
+  }
   const otp = generateOtp();
 
   await createEmailOtpRecord(normalizedEmail, otp);

@@ -44,6 +44,13 @@ function presentPhotos(photos: unknown): string[] {
     .filter((item) => item.length > 0);
 }
 
+const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+
+function isUserOnline(user: any): boolean {
+  if (!user?.lastActive || user.preferences?.showOnline === false) return false;
+  return Date.now() - new Date(user.lastActive).getTime() < ONLINE_WINDOW_MS;
+}
+
 export function presentUser(user: any) {
   if (!user) return null;
   const photos = presentPhotos(user.photos);
@@ -86,7 +93,7 @@ export function presentUser(user: any) {
     relationshipStatus: user.relationshipStatus ?? "single",
     location: user.location,
     isVerified: Boolean(user.isVerified),
-    isOnline: Boolean(user.isOnline),
+    isOnline: isUserOnline(user),
     lastActive: user.lastActive ?? user.updatedAt,
     createdAt: user.createdAt,
     active: user.active !== false,
@@ -158,7 +165,7 @@ export function presentConversation(
     lastMessage: conversation.lastMessage ?? "",
     lastMessageTime: conversation.lastMessageAt ?? conversation.updatedAt,
     unreadCount,
-    isOnline: Boolean(otherUser?.isOnline),
+    isOnline: isUserOnline(otherUser),
     lastSeenTime: otherUser?.lastActive ?? null,
     messages,
     isBlocked: (conversation.blockedBy ?? []).some(

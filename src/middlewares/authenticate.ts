@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AuthError } from "../errors/AuthError";
+import { UserModel } from "../models/User";
 import { verifyAccessToken } from "../utils/jwt";
 
 export function authenticateAccessToken(
@@ -20,6 +21,11 @@ export function authenticateAccessToken(
 
     const payload = verifyAccessToken(token);
     res.locals.user = payload;
+    const now = Date.now();
+    UserModel.updateOne(
+      { _id: payload.sub, lastActive: { $lt: new Date(now - 30_000) } },
+      { lastActive: new Date(now) },
+    ).catch(() => {});
     next();
   } catch (_error) {
     next(new AuthError("Invalid or expired access token", 401));
