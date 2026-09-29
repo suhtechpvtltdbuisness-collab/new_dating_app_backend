@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import {
   changePassword,
+  checkEmailAvailable,
   generateEmailOtp,
   generateUserOtp,
   getUserProfile,
@@ -17,6 +18,22 @@ import {
 } from "../services/user.service";
 import { listProfiles } from "../services/discovery.service";
 import { numericQuery, optionalUserId, requireUserId } from "../utils/context";
+
+export async function checkEmailAvailableHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const email = Array.isArray(req.params.email)
+      ? req.params.email[0]
+      : req.params.email;
+    const result = await checkEmailAvailable(email ?? "");
+    res.status(200).json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function registerUserHandler(
   req: Request,

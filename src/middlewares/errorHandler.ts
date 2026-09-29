@@ -35,6 +35,28 @@ export function errorHandler(
     return;
   }
 
+  const mongoError = error as {
+    code?: number;
+    keyPattern?: Record<string, unknown>;
+  };
+  if (mongoError.code === 11000) {
+    const field = Object.keys(mongoError.keyPattern ?? {})[0];
+    if (field === "email") {
+      res.status(409).json({ message: "Email already exists" });
+      return;
+    }
+    if (field === "phoneNumber") {
+      res.status(409).json({ message: "Phone number already exists" });
+      return;
+    }
+    if (field === "googleId") {
+      res.status(409).json({ message: "Email already exists" });
+      return;
+    }
+    res.status(409).json({ message: "Account already exists" });
+    return;
+  }
+
   res.status(500).json({
     message: "Internal server error",
     error: process.env.NODE_ENV === "production" ? undefined : error.message,

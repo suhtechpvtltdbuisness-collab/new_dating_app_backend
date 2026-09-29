@@ -240,11 +240,16 @@ export async function validateUserOtp(number: string, otp?: string) {
   return { number: input.number, valid: true };
 }
 
-export async function generateEmailOtp(email: string) {
+export async function checkEmailAvailable(email: string) {
   const normalizedEmail = validateOtpEmail(email);
   if (await findUserByEmail(normalizedEmail)) {
     throw new AuthError("Email already exists", 409);
   }
+  return { email: normalizedEmail, available: true as const };
+}
+
+export async function generateEmailOtp(email: string) {
+  const { email: normalizedEmail } = await checkEmailAvailable(email);
   const otp = generateOtp();
 
   await createEmailOtpRecord(normalizedEmail, otp);
@@ -258,6 +263,8 @@ export async function generateEmailOtp(email: string) {
 
 export async function validateEmailOtp(email: string, otp?: string) {
   const input = validateEmailOtpInput(email, otp);
+  // Re-check so a taken address never slips past OTP into later signup steps.
+  await checkEmailAvailable(input.email);
   const otpDoc = await findValidEmailOtp(input.email, input.otp);
 
   if (!otpDoc) {

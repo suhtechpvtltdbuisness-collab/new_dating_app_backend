@@ -15,6 +15,7 @@ import {
 } from "../controller/account.controller";
 import {
   changePasswordHandler,
+  checkEmailAvailableHandler,
   forgotPasswordHandler,
   generateEmailOtpHandler,
   generateOtpHandler,
@@ -32,6 +33,7 @@ import {
 
 const userRouter = Router();
 
+userRouter.get("/email-available/:email", checkEmailAvailableHandler);
 userRouter.get("/otp/email/:email", generateEmailOtpHandler);
 userRouter.post("/otp/email/validate", validateEmailOtpHandler);
 userRouter.get("/otp/:number", generateOtpHandler);

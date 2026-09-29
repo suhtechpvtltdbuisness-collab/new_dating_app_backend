@@ -5,7 +5,9 @@ import { ConversationModel } from "../models/Conversation";
 import { ReportModel } from "../models/Report";
 import { UserModel } from "../models/User";
 import { presentConversation, presentMessage } from "../presenters";
+import { assertMessageAllowed } from "../utils/contentModeration";
 import { validateObjectId } from "../validation/chat.validation";
+import { createUserNotification } from "./notification.service";
 import {
   publishConversationMessage,
   publishMessagesRead,
@@ -210,6 +212,7 @@ export async function createConversation(
 
   const message = payload?.message?.trim();
   if (message) {
+    assertMessageAllowed(message);
     await appendMessage(conversation, validUserId, recipientId, { message });
   }
 
@@ -238,6 +241,8 @@ async function appendMessage(
     attachmentType?: string;
   },
 ) {
+  assertMessageAllowed(payload.message);
+
   const chat = await ChatModel.create({
     conversationId: conversation._id,
     senderId,
@@ -274,6 +279,22 @@ async function appendMessage(
     lastMessageAt: chat.createdAt,
     recipientId,
   });
+
+  const senderName = sender?.name?.trim() || "Someone";
+  const preview =
+    payload.message.length > 120
+      ? `${payload.message.slice(0, 117)}...`
+      : payload.message;
+  void createUserNotification(recipientId, {
+    type: "chat",
+    title: `New message from ${senderName}`,
+    body: preview,
+    metadata: {
+      conversationId: String(conversation._id),
+      senderId,
+      messageId: String(chat._id),
+    },
+  }).catch(() => undefined);
 
   return { chat, presented };
 }
