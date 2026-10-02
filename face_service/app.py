@@ -10,7 +10,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
-DATA_URL = re.compile(r"^data:image/(?:jpeg|jpg|png);base64,([A-Za-z0-9+/=]+)$")
+DATA_URL = re.compile(r"^data:image/(?:jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$")
 DETECTOR_MODEL = os.getenv("FACE_DETECTOR_MODEL", "/app/models/face_detection_yunet.onnx")
 RECOGNIZER_MODEL = os.getenv("FACE_RECOGNIZER_MODEL", "/app/models/face_recognition_sface.onnx")
 SERVICE_KEY = os.getenv("FACE_RECOGNITION_SERVICE_KEY", "")

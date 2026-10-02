@@ -1,10 +1,15 @@
-import type { ReadableStream } from "stream/web";
+import type { Readable } from "stream";
+import type { ReadableStream as WebReadableStream } from "stream/web";
 import { AuthError } from "../errors/AuthError";
 import { env } from "../config/env";
 import { MediaModel } from "../models/Media";
 import { UserModel } from "../models/User";
 import { presentUser } from "../presenters";
-import { extractBlobPathname, readPrivateBlob } from "./media.service";
+import {
+  extractBlobPathname,
+  readPrivateBlob,
+  readVolumeFile,
+} from "./media.service";
 
 type ImagePayload = {
   bytes: Buffer;
@@ -38,8 +43,20 @@ function toDataUrl({ bytes, contentType }: ImagePayload): string {
   return `data:${type};base64,${bytes.toString("base64")}`;
 }
 
-async function streamToBuffer(stream: ReadableStream): Promise<Buffer> {
-  const reader = stream.getReader();
+async function streamToBuffer(
+  stream: WebReadableStream | Readable | NodeJS.ReadableStream,
+): Promise<Buffer> {
+  // Node fs createReadStream
+  if ("read" in stream && typeof (stream as Readable).on === "function") {
+    const nodeStream = stream as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of nodeStream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  const reader = (stream as WebReadableStream).getReader();
   const chunks: Uint8Array[] = [];
 
   for (;;) {
@@ -63,14 +80,30 @@ function mediaIdFromPhotoRef(photoRef: string): string | null {
 }
 
 async function loadPhoto(photoRef: string): Promise<ImagePayload> {
-  const blobPathname = extractBlobPathname(photoRef);
-  if (blobPathname && env.blobReadWriteToken) {
-    const result = await readPrivateBlob(blobPathname);
+  const pathname = extractBlobPathname(photoRef);
+
+  // Railway volume files — read directly from disk (don't HTTP round-trip).
+  if (pathname && env.uploadDir) {
+    try {
+      const file = await readVolumeFile(pathname);
+      return {
+        bytes: await streamToBuffer(file.stream),
+        contentType: file.contentType,
+      };
+    } catch (error) {
+      // Fall through to other loaders for legacy blob / mongo / http refs.
+      console.warn("Volume photo load failed, trying other sources", pathname, error);
+    }
+  }
+
+  if (pathname && env.blobReadWriteToken) {
+    const result = await readPrivateBlob(pathname);
     return {
       bytes: await streamToBuffer(
-        result.stream as unknown as ReadableStream,
+        result.stream as unknown as WebReadableStream | Readable,
       ),
-      contentType: result.blob.contentType || "image/jpeg",
+      contentType:
+        ("blob" in result && result.blob?.contentType) || "image/jpeg",
     };
   }
 
@@ -91,7 +124,10 @@ async function loadPhoto(photoRef: string): Promise<ImagePayload> {
   if (/^https?:\/\//i.test(photoRef)) {
     const response = await fetch(photoRef);
     if (!response.ok) {
-      throw new AuthError("Profile photo could not be loaded", 422);
+      throw new AuthError(
+        `Profile photo could not be loaded (${response.status})`,
+        422,
+      );
     }
     return {
       bytes: Buffer.from(await response.arrayBuffer()),
@@ -206,30 +242,54 @@ export async function verifySelfieAgainstProfilePhotos(
   let bestScore = Number.POSITIVE_INFINITY;
   let bestPhoto = "";
   let compared = 0;
+  let loadFailures = 0;
+  let faceFailures = 0;
 
   for (const photo of photos) {
     try {
-      const photoEmbedding = await createEmbedding(await loadPhoto(photo));
-      const score = cosineDistance(selfieEmbedding, photoEmbedding);
-      compared += 1;
+      const image = await loadPhoto(photo);
+      try {
+        const photoEmbedding = await createEmbedding(image);
+        const score = cosineDistance(selfieEmbedding, photoEmbedding);
+        compared += 1;
 
-      if (score < bestScore) {
-        bestScore = score;
-        bestPhoto = photo;
+        if (score < bestScore) {
+          bestScore = score;
+          bestPhoto = photo;
+        }
+      } catch (error) {
+        faceFailures += 1;
+        if (
+          error instanceof AuthError &&
+          (error.status === 502 || error.status === 503)
+        ) {
+          throw error;
+        }
+        console.warn("Profile photo had no usable face", photo, error);
       }
     } catch (error) {
+      loadFailures += 1;
       if (
         error instanceof AuthError &&
         (error.status === 502 || error.status === 503)
       ) {
         throw error;
       }
-      console.warn("Skipping profile photo during selfie verification", error);
+      console.warn("Skipping profile photo during selfie verification", photo, error);
     }
   }
 
   if (!compared || !Number.isFinite(bestScore)) {
-    throw new AuthError("No profile photo had a usable face for comparison", 422);
+    if (loadFailures === photos.length) {
+      throw new AuthError(
+        "Your profile photos could not be loaded for face comparison. Re-upload a clear face photo and try again.",
+        422,
+      );
+    }
+    throw new AuthError(
+      "No profile photo had a usable face for comparison. Use a clear, front-facing photo with exactly one face.",
+      422,
+    );
   }
 
   const verified = bestScore <= env.faceMatchThreshold;
