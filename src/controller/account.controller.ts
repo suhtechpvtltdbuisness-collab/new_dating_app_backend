@@ -12,6 +12,7 @@ import {
   updateUserPreferences,
 } from "../services/account.service";
 import { storeUploads } from "../services/media.service";
+import { verifySelfieAgainstProfilePhotos } from "../services/selfieVerification.service";
 import { param, requireUserId } from "../utils/context";
 
 export async function getUserHandler(
@@ -85,6 +86,24 @@ export async function deletePhotoHandler(
       "";
     const result = await removeUserPhoto(userId, photoRef);
     res.status(200).json({ message: "Photo deleted", data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifySelfieHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = requireUserId(res);
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    const selfie =
+      files.find((file) => ["selfie", "file", "photo"].includes(file.fieldname)) ??
+      files[0];
+    const result = await verifySelfieAgainstProfilePhotos(userId, selfie);
+    res.status(200).json({ message: result.reason, data: result });
   } catch (error) {
     next(error);
   }

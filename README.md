@@ -49,6 +49,9 @@ npm run dev
 - `SMTP_USER`: SMTP username
 - `SMTP_PASS`: SMTP password
 - `SMTP_FROM`: sender display/address used for OTP emails
+- `FACE_RECOGNITION_SERVICE_URL`: optional OpenCV face service base URL for selfie verification
+- `FACE_RECOGNITION_SERVICE_KEY`: shared secret sent to the face service
+- `FACE_MATCH_THRESHOLD`: cosine distance threshold; default `0.42`
 
 ## Users Module Endpoints
 
@@ -150,6 +153,7 @@ bare array.
 | GET / PUT | `/profile` | Current user; `PUT` accepts `firstName`/`lastName` and maps them to `name` |
 | GET / PUT / DELETE | `/users/:id` | Writes and deletes are self-only (403 otherwise) |
 | POST | `/users/upload-photo` | Multipart; field name `file`, `files`, `photo`, `photos`, or `media` |
+| POST | `/users/verify-selfie` | Multipart live selfie in `selfie`/`file`; compares against uploaded profile photos and sets `isVerified` |
 | DELETE | `/users/delete-photo/:photoId` | |
 | GET / PUT | `/users/preferences` | Age range, distance, `lookingFor`, `preferredGenders` |
 | POST | `/users/:id/block` | `{ blockedUserId }` |
@@ -160,6 +164,12 @@ bare array.
 Uploads are stored in the `media` collection and returned as absolute URLs, so
 no object storage is required. Swap `media.service.ts` for S3/Cloudinary when
 image volume justifies it.
+
+Selfie verification requires the private OpenCV face service in
+`./face_service` or a compatible service that exposes `POST /v1/embeddings`.
+Without `FACE_RECOGNITION_SERVICE_URL`, the endpoint returns `503` and does not
+mark users as verified. Deploy `./face_service` as a separate Railway service
+and set the generated Railway URL as `FACE_RECOGNITION_SERVICE_URL`.
 
 ## Discovery, Swipes & Matches
 

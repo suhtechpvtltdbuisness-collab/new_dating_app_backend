@@ -12,6 +12,7 @@ import {
   updatePreferencesHandler,
   updateUserHandler,
   uploadPhotoHandler,
+  verifySelfieHandler,
 } from "../controller/account.controller";
 import {
   changePasswordHandler,
@@ -54,6 +55,7 @@ userRouter.use(
     "/preferences",
     "/blocked",
     "/upload-photo",
+    "/verify-selfie",
     "/delete-photo",
   ],
   authenticateAccessToken,
@@ -66,6 +68,7 @@ userRouter.get("/preferences", getPreferencesHandler);
 userRouter.put("/preferences", updatePreferencesHandler);
 userRouter.get("/blocked", getBlockedUsersHandler);
 userRouter.post("/upload-photo", uploadAny, uploadPhotoHandler);
+userRouter.post("/verify-selfie", uploadAny, verifySelfieHandler);
 userRouter.delete("/delete-photo", deletePhotoHandler);
 userRouter.delete("/delete-photo/:photoId", deletePhotoHandler);
 

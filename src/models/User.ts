@@ -81,6 +81,20 @@ const userSchema = new Schema(
     relationshipStatus: { type: String, trim: true, default: "single" },
     blockedUsers: [{ type: Schema.Types.ObjectId, ref: "User" }],
     isVerified: { type: Boolean, default: false },
+    selfieVerification: {
+      status: {
+        type: String,
+        enum: ["not_started", "verified", "failed", "service_unavailable"],
+        default: "not_started",
+      },
+      score: { type: Number },
+      threshold: { type: Number },
+      matchedPhotoUrl: { type: String },
+      provider: { type: String },
+      reason: { type: String },
+      verifiedAt: { type: Date },
+      lastAttemptAt: { type: Date },
+    },
     isOnline: { type: Boolean, default: false },
     lastActive: { type: Date, default: Date.now },
     preferences: {
