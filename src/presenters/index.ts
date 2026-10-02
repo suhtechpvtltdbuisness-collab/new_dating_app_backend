@@ -147,6 +147,10 @@ export function presentPreferences(user: any) {
 }
 
 export function presentMessage(chat: any, sender?: any) {
+  const isRead = Boolean(chat.readAt);
+  const isDelivered = Boolean(chat.deliveredAt) || isRead;
+  const status = isRead ? "read" : isDelivered ? "delivered" : "sent";
+
   return {
     id: toId(chat._id),
     conversationId: toId(chat.conversationId),
@@ -155,8 +159,10 @@ export function presentMessage(chat: any, sender?: any) {
     senderImage: firstPhoto(sender),
     message: chat.message ?? "",
     timestamp: chat.createdAt,
-    status: chat.readAt ? "read" : "sent",
-    isRead: Boolean(chat.readAt),
+    status,
+    isRead,
+    deliveredAt: chat.deliveredAt ?? null,
+    readAt: chat.readAt ?? null,
     attachmentUrl: chat.attachmentUrl ?? null,
     attachmentType: chat.attachmentType ?? null,
   };

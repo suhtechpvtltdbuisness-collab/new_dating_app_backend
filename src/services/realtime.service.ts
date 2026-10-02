@@ -99,6 +99,29 @@ export async function publishTyping(params: {
   ]);
 }
 
+export async function publishMessagesDelivered(params: {
+  conversationId: string;
+  userId: string;
+  participantIds: string[];
+  messageIds: string[];
+}): Promise<void> {
+  if (params.messageIds.length === 0) return;
+
+  const payload = {
+    conversationId: params.conversationId,
+    userId: params.userId,
+    messageIds: params.messageIds,
+  };
+
+  await broadcast([
+    {
+      topic: `conversation:${params.conversationId}`,
+      event: "messages_delivered",
+      payload,
+    },
+  ]);
+}
+
 export async function publishMessagesRead(params: {
   conversationId: string;
   userId: string;

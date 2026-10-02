@@ -10,6 +10,7 @@ import { validateObjectId } from "../validation/chat.validation";
 import { createUserNotification } from "./notification.service";
 import {
   publishConversationMessage,
+  publishMessagesDelivered,
   publishMessagesRead,
   publishTyping,
 } from "./realtime.service";
@@ -243,6 +244,11 @@ async function appendMessage(
 ) {
   assertMessageAllowed(payload.message);
 
+  const recipient = await UserModel.findById(recipientId)
+    .select("isOnline")
+    .lean();
+  const deliveredNow = recipient?.isOnline === true ? new Date() : undefined;
+
   const chat = await ChatModel.create({
     conversationId: conversation._id,
     senderId,
@@ -250,6 +256,7 @@ async function appendMessage(
     message: payload.message,
     attachmentUrl: payload.attachmentUrl,
     attachmentType: payload.attachmentType,
+    ...(deliveredNow ? { deliveredAt: deliveredNow } : {}),
   });
 
   await ConversationModel.updateOne(
@@ -299,6 +306,36 @@ async function appendMessage(
   return { chat, presented };
 }
 
+async function markIncomingDelivered(
+  userId: string,
+  conversation: { _id: Types.ObjectId; participants: unknown[] },
+) {
+  const pending = await ChatModel.find({
+    conversationId: conversation._id,
+    recipientId: userId,
+    deliveredAt: { $exists: false },
+    deletedAt: { $exists: false },
+  })
+    .select("_id")
+    .lean();
+
+  if (pending.length === 0) return;
+
+  const now = new Date();
+  const ids = pending.map((item) => item._id);
+  await ChatModel.updateMany(
+    { _id: { $in: ids } },
+    { $set: { deliveredAt: now } },
+  );
+
+  void publishMessagesDelivered({
+    conversationId: String(conversation._id),
+    userId,
+    participantIds: participantIds(conversation),
+    messageIds: ids.map((id) => String(id)),
+  });
+}
+
 export async function getConversation(
   userId: string,
   chatId: string,
@@ -308,6 +345,8 @@ export async function getConversation(
   const validUserId = validateObjectId(userId, "userId");
   const conversation = await requireConversation(validUserId, chatId);
   const otherId = otherParticipantId(conversation, validUserId);
+
+  await markIncomingDelivered(validUserId, conversation);
 
   const [otherUser, messagePage] = await Promise.all([
     UserModel.findById(otherId).select("name photos isOnline lastActive preferences.showOnline").lean(),
@@ -336,6 +375,8 @@ export async function listConversationMessages(
   const conversation = await requireConversation(validUserId, chatId);
   const safePage = clamp(page, 1, 1000);
   const safeLimit = clamp(limit, DEFAULT_MESSAGE_LIMIT, 200);
+
+  await markIncomingDelivered(validUserId, conversation);
 
   return loadMessages(conversation._id, safePage, safeLimit);
 }
@@ -386,6 +427,7 @@ export async function sendConversationMessage(
 export async function markConversationRead(userId: string, chatId: string) {
   const validUserId = validateObjectId(userId, "userId");
   const conversation = await requireConversation(validUserId, chatId);
+  const now = new Date();
 
   await Promise.all([
     ChatModel.updateMany(
@@ -394,13 +436,28 @@ export async function markConversationRead(userId: string, chatId: string) {
         recipientId: validUserId,
         readAt: { $exists: false },
       },
-      { readAt: new Date() },
+      {
+        $set: {
+          readAt: now,
+          deliveredAt: now,
+        },
+      },
     ),
     ConversationModel.updateOne(
       { _id: conversation._id },
       { $set: { [`unread.${validUserId}`]: 0 } },
     ),
   ]);
+
+  // Ensure deliveredAt is set even when readAt already existed.
+  await ChatModel.updateMany(
+    {
+      conversationId: conversation._id,
+      recipientId: validUserId,
+      deliveredAt: { $exists: false },
+    },
+    { $set: { deliveredAt: now } },
+  );
 
   void publishMessagesRead({
     conversationId: String(conversation._id),

@@ -24,6 +24,7 @@ const chatSchema = new Schema(
     attachmentType: { type: String, enum: ["image", "video", "document"] },
     editedAt: { type: Date },
     deletedAt: { type: Date },
+    deliveredAt: { type: Date },
     readAt: { type: Date },
   },
   { timestamps: true },
