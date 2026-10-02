@@ -167,7 +167,7 @@ export function validateUpdateProfileInput(
 }
 
 const LOOKING_FOR = ["dating", "relationship", "friendship", "networking"];
-const GENDERS = ["male", "female", "other"];
+const GENDERS = ["male", "female", "other", "non-binary"];
 
 export function validateUpdatePreferencesInput(
   payload: Record<string, unknown>,

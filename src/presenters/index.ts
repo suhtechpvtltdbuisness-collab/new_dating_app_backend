@@ -2,10 +2,17 @@ import { env } from "../config/env";
 import { toViewablePhotoUrl } from "../services/media.service";
 
 const LOOKING_FOR = ["dating", "relationship", "friendship", "networking"];
-const GENDERS = ["male", "female", "other"];
+const GENDERS = ["male", "female", "other", "non-binary"];
 
 const FEMALE_LABELS = ["female", "women", "woman", "f", "girl"];
 const MALE_LABELS = ["male", "men", "man", "m", "boy"];
+const NON_BINARY_LABELS = [
+  "non-binary",
+  "nonbinary",
+  "non binary",
+  "gay",
+  "other",
+];
 
 export function normalizeGender(value: unknown): string {
   const v = String(value ?? "")
@@ -13,6 +20,7 @@ export function normalizeGender(value: unknown): string {
     .toLowerCase();
   if (FEMALE_LABELS.includes(v)) return "female";
   if (MALE_LABELS.includes(v)) return "male";
+  if (NON_BINARY_LABELS.includes(v)) return "non-binary";
   return "other";
 }
 

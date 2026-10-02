@@ -7,6 +7,13 @@ import { validateObjectId } from "../validation/chat.validation";
 
 const FEMALE_LABELS = ["female", "women", "woman", "f", "girl"];
 const MALE_LABELS = ["male", "men", "man", "m", "boy"];
+const NON_BINARY_LABELS = [
+  "non-binary",
+  "nonbinary",
+  "non binary",
+  "gay",
+  "other",
+];
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
@@ -16,6 +23,7 @@ function labelsForGender(value: string): string[] {
     .toLowerCase();
   if (FEMALE_LABELS.includes(v)) return FEMALE_LABELS;
   if (MALE_LABELS.includes(v)) return MALE_LABELS;
+  if (NON_BINARY_LABELS.includes(v)) return NON_BINARY_LABELS;
   return [v];
 }
 

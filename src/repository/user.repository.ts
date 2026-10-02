@@ -37,11 +37,19 @@ export function findUserByPhone(phoneNumber: string) {
 
 const FEMALE_LABELS = ["female", "women", "woman", "f", "girl"];
 const MALE_LABELS = ["male", "men", "man", "m", "boy"];
+const NON_BINARY_LABELS = [
+  "non-binary",
+  "nonbinary",
+  "non binary",
+  "gay",
+  "other",
+];
 
 function labelsForGender(value: string): string[] {
   const v = value.trim().toLowerCase();
   if (FEMALE_LABELS.includes(v)) return FEMALE_LABELS;
   if (MALE_LABELS.includes(v)) return MALE_LABELS;
+  if (NON_BINARY_LABELS.includes(v)) return NON_BINARY_LABELS;
   return [v];
 }
 
