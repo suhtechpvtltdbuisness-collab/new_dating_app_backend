@@ -1,4 +1,7 @@
 import type { Request } from "express";
+import fs from "fs/promises";
+import path from "path";
+import { createReadStream, existsSync, mkdirSync } from "fs";
 import { del, get, put } from "@vercel/blob";
 import { AuthError } from "../errors/AuthError";
 import { env } from "../config/env";
@@ -21,6 +24,39 @@ function safeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "photo.jpg";
 }
 
+function contentTypeFromName(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  switch (ext) {
+    case ".png":
+      return "image/png";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    case ".jpg":
+    case ".jpeg":
+    default:
+      return "image/jpeg";
+  }
+}
+
+function ensureUploadRoot(): string {
+  const root = env.uploadDir;
+  if (!existsSync(root)) {
+    mkdirSync(root, { recursive: true });
+  }
+  return root;
+}
+
+function isVolumePath(value: string): boolean {
+  return (
+    value.includes("/media/file/") ||
+    value.startsWith("profiles/") ||
+    value.startsWith("chat/") ||
+    value.startsWith("uploads/")
+  );
+}
+
 export function extractBlobPathname(photoRef: string): string | null {
   const value = photoRef?.trim();
   if (!value) return null;
@@ -32,12 +68,21 @@ export function extractBlobPathname(photoRef: string): string | null {
     if (asUrl.hostname.includes("blob.vercel-storage.com")) {
       return decodeURIComponent(asUrl.pathname.replace(/^\//, ""));
     }
+    const fileMatch = asUrl.pathname.match(/\/media\/file\/(.+)$/);
+    if (fileMatch?.[1]) {
+      return decodeURIComponent(fileMatch[1]);
+    }
   } catch {
     // Not a URL — treat as pathname if it looks like one.
   }
 
+  const relativeFile = value.match(/(?:^|\/)media\/file\/(.+)$/);
+  if (relativeFile?.[1]) {
+    return decodeURIComponent(relativeFile[1]);
+  }
+
   if (value.includes("/") && !value.startsWith("http")) {
-    return value;
+    return value.replace(/^\//, "");
   }
 
   return null;
@@ -45,14 +90,62 @@ export function extractBlobPathname(photoRef: string): string | null {
 
 export function toViewablePhotoUrl(stored: string, baseUrl: string): string {
   const pathname = extractBlobPathname(stored);
+  const root = baseUrl.replace(/\/$/, "");
+
   if (
     pathname &&
     (stored.includes("blob.vercel-storage.com") ||
       stored.includes("/media/view"))
   ) {
-    return `${baseUrl.replace(/\/$/, "")}/media/view?pathname=${encodeURIComponent(pathname)}`;
+    return `${root}/media/view?pathname=${encodeURIComponent(pathname)}`;
   }
+
+  if (pathname && isVolumePath(stored)) {
+    return `${root}/media/file/${pathname.split("/").map(encodeURIComponent).join("/")}`;
+  }
+
+  if (stored.startsWith("http://") || stored.startsWith("https://")) {
+    // Rewrite old Vercel host URLs to the current public base when possible.
+    try {
+      const asUrl = new URL(stored);
+      if (
+        asUrl.hostname.includes("vercel.app") &&
+        root &&
+        !asUrl.href.startsWith(root)
+      ) {
+        return `${root}${asUrl.pathname}${asUrl.search}`;
+      }
+    } catch {
+      // keep original
+    }
+    return stored;
+  }
+
   return stored;
+}
+
+async function storeOnVolume(
+  req: Request,
+  ownerId: string,
+  files: Express.Multer.File[],
+): Promise<string[]> {
+  const root = ensureUploadRoot();
+  const urls: string[] = [];
+
+  for (const file of files) {
+    const filename = safeFilename(file.originalname || "photo.jpg");
+    const relativePath = path.posix.join(
+      "profiles",
+      ownerId,
+      `${Date.now()}-${filename}`,
+    );
+    const absolutePath = path.join(root, relativePath);
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+    await fs.writeFile(absolutePath, file.buffer);
+    urls.push(`${baseUrlOf(req)}/media/file/${relativePath}`);
+  }
+
+  return urls;
 }
 
 async function storeInVercelBlob(
@@ -106,6 +199,11 @@ export async function storeUploads(
     throw new AuthError("No file uploaded", 400);
   }
 
+  // Railway (and similar hosts) mount a persistent volume — prefer that.
+  if (env.uploadDir) {
+    return storeOnVolume(req, ownerId, files);
+  }
+
   if (env.blobReadWriteToken) {
     return storeInVercelBlob(req, ownerId, files);
   }
@@ -123,11 +221,51 @@ export async function readMedia(mediaId: string) {
   return media;
 }
 
+export async function readVolumeFile(relativePath: string) {
+  const clean = relativePath?.trim().replace(/^\/+/, "");
+  if (!clean || clean.includes("..")) {
+    throw new AuthError("Invalid media path", 400);
+  }
+
+  const absolutePath = path.join(ensureUploadRoot(), clean);
+  const root = path.resolve(ensureUploadRoot());
+  if (!path.resolve(absolutePath).startsWith(root)) {
+    throw new AuthError("Invalid media path", 400);
+  }
+
+  try {
+    await fs.access(absolutePath);
+  } catch {
+    throw new AuthError("Not found", 404);
+  }
+
+  return {
+    stream: createReadStream(absolutePath),
+    contentType: contentTypeFromName(clean),
+  };
+}
+
 export async function readPrivateBlob(pathname: string) {
   const clean = pathname?.trim();
   if (!clean) {
     throw new AuthError("Missing pathname", 400);
   }
+
+  // Volume-backed files can also be requested via /media/view?pathname=
+  if (env.uploadDir) {
+    try {
+      const volumeFile = await readVolumeFile(clean);
+      return {
+        statusCode: 200,
+        stream: volumeFile.stream,
+        blob: { contentType: volumeFile.contentType },
+        fromVolume: true as const,
+      };
+    } catch (error) {
+      if (!env.blobReadWriteToken) throw error;
+    }
+  }
+
   if (!env.blobReadWriteToken) {
     throw new AuthError("Blob storage is not configured", 503);
   }
@@ -145,9 +283,21 @@ export async function readPrivateBlob(pathname: string) {
 }
 
 export async function deleteBlobIfPresent(photoRef: string): Promise<void> {
+  const pathname = extractBlobPathname(photoRef);
+  if (!pathname) return;
+
+  if (env.uploadDir && isVolumePath(photoRef)) {
+    try {
+      const absolutePath = path.join(ensureUploadRoot(), pathname);
+      await fs.unlink(absolutePath);
+    } catch (error) {
+      console.warn("Failed to delete volume file", pathname, error);
+    }
+    return;
+  }
+
   if (!env.blobReadWriteToken) return;
 
-  const pathname = extractBlobPathname(photoRef);
   const target = pathname || photoRef;
   if (!target) return;
 

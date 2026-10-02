@@ -38,9 +38,20 @@ export const env = {
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:3000",
   publicBaseUrl: (
     process.env.PUBLIC_BASE_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
+    (process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "")
   ).replace(/\/$/, ""),
+  /** Railway volume mount path for persistent uploads. Empty = blob/mongo fallback. */
+  uploadDir: (process.env.UPLOAD_DIR ?? "").replace(/\/$/, ""),
   blobReadWriteToken: process.env.BLOB_READ_WRITE_TOKEN ?? "",
+  faceRecognitionServiceUrl: (
+    process.env.FACE_RECOGNITION_SERVICE_URL ?? ""
+  ).replace(/\/$/, ""),
+  faceRecognitionServiceKey: process.env.FACE_RECOGNITION_SERVICE_KEY ?? "",
+  faceMatchThreshold: Number(process.env.FACE_MATCH_THRESHOLD ?? 0.42),
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",

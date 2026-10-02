@@ -29,7 +29,7 @@ function firstPhoto(user: any): string {
 function apiBaseUrl(): string {
   return (
     env.publicBaseUrl ||
-    "https://new-dating-app-backend.vercel.app"
+    "https://newdatingappbackend-production.up.railway.app"
   ).replace(/\/$/, "");
 }
 
@@ -93,6 +93,16 @@ export function presentUser(user: any) {
     relationshipStatus: user.relationshipStatus ?? "single",
     location: user.location,
     isVerified: Boolean(user.isVerified),
+    selfieVerification: {
+      status:
+        user.selfieVerification?.status ??
+        (user.isVerified ? "verified" : "not_started"),
+      score: user.selfieVerification?.score ?? null,
+      threshold: user.selfieVerification?.threshold ?? null,
+      reason: user.selfieVerification?.reason ?? "",
+      verifiedAt: user.selfieVerification?.verifiedAt ?? null,
+      lastAttemptAt: user.selfieVerification?.lastAttemptAt ?? null,
+    },
     isOnline: isUserOnline(user),
     lastActive: user.lastActive ?? user.updatedAt,
     createdAt: user.createdAt,
