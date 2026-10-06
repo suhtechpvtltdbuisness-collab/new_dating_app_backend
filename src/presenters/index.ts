@@ -34,11 +34,20 @@ function firstPhoto(user: any): string {
     : "";
 }
 
+const DEFAULT_PUBLIC_BASE =
+  "https://newdatingappbackend-production.up.railway.app";
+
 function apiBaseUrl(): string {
-  return (
-    env.publicBaseUrl ||
-    "https://newdatingappbackend-production.up.railway.app"
-  ).replace(/\/$/, "");
+  const configured = env.publicBaseUrl.replace(/\/$/, "");
+  // Stale PUBLIC_BASE_URL often still points at the old Vercel host after migration.
+  if (configured && !configured.includes("vercel.app")) {
+    return configured;
+  }
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  if (railwayDomain) {
+    return `https://${railwayDomain.replace(/\/$/, "")}`;
+  }
+  return DEFAULT_PUBLIC_BASE;
 }
 
 function presentPhoto(url: string): string {
@@ -163,7 +172,9 @@ export function presentMessage(chat: any, sender?: any) {
     isRead,
     deliveredAt: chat.deliveredAt ?? null,
     readAt: chat.readAt ?? null,
-    attachmentUrl: chat.attachmentUrl ?? null,
+    attachmentUrl: chat.attachmentUrl
+      ? presentPhoto(String(chat.attachmentUrl))
+      : null,
     attachmentType: chat.attachmentType ?? null,
   };
 }

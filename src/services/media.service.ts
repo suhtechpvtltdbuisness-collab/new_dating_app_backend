@@ -105,15 +105,14 @@ export function toViewablePhotoUrl(stored: string, baseUrl: string): string {
   }
 
   if (stored.startsWith("http://") || stored.startsWith("https://")) {
-    // Rewrite old Vercel host URLs to the current public base when possible.
+    // Rewrite legacy deployment hosts to the current public base (same /media path).
     try {
       const asUrl = new URL(stored);
-      if (
-        asUrl.hostname.includes("vercel.app") &&
-        root &&
-        !asUrl.href.startsWith(root)
-      ) {
-        return `${root}${asUrl.pathname}${asUrl.search}`;
+      if (root && asUrl.pathname.startsWith("/media")) {
+        const currentHost = new URL(`${root}/`).hostname;
+        if (asUrl.hostname !== currentHost) {
+          return `${root}${asUrl.pathname}${asUrl.search}`;
+        }
       }
     } catch {
       // keep original
