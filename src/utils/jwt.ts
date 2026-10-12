@@ -40,4 +40,21 @@ export function verifyAccessToken(token: string): TokenPayload {
   return jwt.verify(token, env.accessSecret) as TokenPayload;
 }
 
-export type { TokenPayload };
+interface AdminTokenPayload {
+  sub: string;
+  username: string;
+}
+
+export function signAdminToken(payload: AdminTokenPayload): string {
+  return signToken(
+    payload as unknown as TokenPayload,
+    env.admin.jwtSecret,
+    env.admin.tokenTtl,
+  );
+}
+
+export function verifyAdminToken(token: string): AdminTokenPayload {
+  return jwt.verify(token, env.admin.jwtSecret) as AdminTokenPayload;
+}
+
+export type { AdminTokenPayload, TokenPayload };

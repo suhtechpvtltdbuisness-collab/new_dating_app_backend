@@ -89,6 +89,7 @@ async function baseFilter(userId: string, query: DiscoveryQuery) {
     gender: { $in: genderFilter },
     active: true,
     isHidden: { $ne: true },
+    isBanned: { $ne: true },
     blockedUsers: { $ne: new Types.ObjectId(userId) },
   };
 
@@ -153,6 +154,7 @@ export async function getProfileById(viewerId: string, profileId: string) {
   if (
     !user ||
     user.active === false ||
+    user.isBanned ||
     (user.isHidden && String(user._id) !== viewerId)
   ) {
     throw new AuthError("Profile not found", 404);

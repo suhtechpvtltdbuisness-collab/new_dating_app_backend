@@ -7,6 +7,7 @@ import morgan from "morgan";
 import { connectDatabase } from "./config/db";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
+import adminRouter from "./routes/admin.routes";
 import authRouter from "./routes/auth.routes";
 import chatHistoryRouter from "./routes/chat-history.routes";
 import chatUsersRouter from "./routes/chat-users.routes";
@@ -111,6 +112,7 @@ app.get("/health", async (_req, res) => {
 
 app.use(
   [
+    "/admin",
     "/auth",
     "/users",
     "/chats",
@@ -133,6 +135,7 @@ app.use(
   },
 );
 
+app.use("/admin", adminRouter);
 app.use("/auth", authRouter);
 app.use("/users", userRouter);
 app.use("/chats", chatRouter);

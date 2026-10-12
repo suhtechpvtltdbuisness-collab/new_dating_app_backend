@@ -52,6 +52,10 @@ npm run dev
 - `FACE_RECOGNITION_SERVICE_URL`: optional OpenCV face service base URL for selfie verification
 - `FACE_RECOGNITION_SERVICE_KEY`: shared secret sent to the face service
 - `FACE_MATCH_THRESHOLD`: cosine distance threshold; default `0.42`
+- `ADMIN_INITIAL_USERNAME`: first admin panel login, default `admin`
+- `ADMIN_INITIAL_PASSWORD`: its password. The admin is created on the first sign-in attempt while no admin exists; if this is unset no admin is created
+- `ADMIN_JWT_SECRET`: optional signing key for admin tokens; derived from `JWT_ACCESS_SECRET` when unset
+- `ADMIN_TOKEN_TTL`: admin token lifetime, default `12h`
 
 ## Users Module Endpoints
 
@@ -204,6 +208,40 @@ belonging to a `conversationId`.
 | POST | `/chats/:chatId/typing` | |
 | POST | `/chats/messages/report` | `{ messageId, reason, details? }` |
 | GET | `/chats/recipient/:recipientId`, `/chat-history/:userId`, `/chat-users` | |
+
+## Admin Panel
+
+Backs the admin panel in `datingapp-landingpage` (`/admin`). Admins are separate accounts (`admins` collection),
+not app users. `POST /admin/auth/login` returns `data.accessToken`; send it as `Authorization: Bearer <token>` on
+every other `/admin` route. Admin tokens are signed with their own key, so they do not work on app routes and app
+tokens do not work here. Ten wrong passwords in a row pause sign-in for that admin for 15 minutes.
+
+List endpoints take `?page=` and `?limit=` (default 50, max 200) and return `{ data, pagination: { page, limit, total, pages } }`.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/admin/auth/login` | `{ username, password }` |
+| POST | `/admin/auth/logout` | Records the logout in the activity log |
+| GET | `/admin/auth/me` | |
+| PUT | `/admin/auth/password` | `{ currentPassword, newPassword, confirmPassword }`; new password min 8 characters |
+| GET | `/admin/stats` | `totalUsers`, `verifiedUsers`, `bannedUsers`, `premiumUsers`, `totalMatches`, `pendingReports` |
+| GET | `/admin/dashboard` | `stats` plus the 5 latest users and reports |
+| GET | `/admin/activity` | Admin audit log, newest first |
+| GET | `/admin/users` | `?q=` searches name, email and phone; `?status=all\|verified\|banned\|premium` |
+| GET | `/admin/users/:id` | `user`, their `matches`, and `reports` filed against them |
+| POST | `/admin/users/:id/ban`, `/unban` | See below |
+| POST | `/admin/users/:id/verify` | Marks the profile verified without a selfie check |
+| DELETE | `/admin/users/:id` | Also removes their swipes (matches), sessions and reports against them |
+| GET | `/admin/reports` | `?status=pending\|resolved\|dismissed\|all` (default `pending`) |
+| POST | `/admin/reports/:id/resolve`, `/dismiss` | |
+| GET | `/admin/matches` | One row per matched pair |
+
+- **Banning** sets `isBanned` on the user. A banned user is hidden from discovery, suggestions, profile lookups and
+  swipes, cannot sign in or refresh their session (`403 This account has been suspended`), and has their refresh
+  tokens revoked. The access token they already hold keeps working until it expires (`ACCESS_TOKEN_TTL`).
+- **Plans**: the app has no paid plans yet, so every user reports `plan: "free"`, `premiumUsers` is `0` and
+  `?status=premium` returns nothing.
+- **Reports**: `open` and `reviewing` both show as `pending`.
 
 ## Notes
 

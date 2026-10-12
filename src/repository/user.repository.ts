@@ -70,6 +70,7 @@ export function getSuggestedUsers(
     interestedIn: { $in: candidateInterestedIn },
     active: true,
     isHidden: { $ne: true },
+    isBanned: { $ne: true },
   })
     .limit(cap)
     .lean();

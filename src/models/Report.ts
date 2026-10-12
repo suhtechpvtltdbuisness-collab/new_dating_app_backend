@@ -14,9 +14,12 @@ const reportSchema = new Schema(
     details: { type: String, trim: true, maxlength: 1000 },
     status: {
       type: String,
-      enum: ["open", "reviewing", "resolved"],
+      enum: ["open", "reviewing", "resolved", "dismissed"],
       default: "open",
+      index: true,
     },
+    // When an admin resolved or dismissed the report.
+    resolvedAt: { type: Date },
   },
   { timestamps: true },
 );

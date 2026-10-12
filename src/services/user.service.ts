@@ -65,6 +65,11 @@ async function issueTokens(
   userId: string,
   phoneNumber: string,
 ): Promise<{ accessToken: string; refreshToken: string }> {
+  // Every sign-in and token refresh comes through here, so a banned user gets no new tokens.
+  if (await UserModel.exists({ _id: userId, isBanned: true })) {
+    throw new AuthError("This account has been suspended", 403);
+  }
+
   const accessToken = signAccessToken({ sub: userId, phoneNumber });
   const refreshToken = signRefreshToken({ sub: userId, phoneNumber });
 

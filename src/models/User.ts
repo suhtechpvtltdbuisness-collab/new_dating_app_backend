@@ -111,6 +111,9 @@ const userSchema = new Schema(
     },
     active: { type: Boolean, default: true },
     isHidden: { type: Boolean, default: false },
+    // Set by an admin from the admin panel; unlike `active`/`isHidden` the user cannot change it.
+    isBanned: { type: Boolean, default: false, index: true },
+    bannedAt: { type: Date },
     ipAddress: { type: String, required: true },
   },
   { timestamps: true },

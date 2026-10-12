@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -27,10 +28,12 @@ function required(name: string, fallback?: string): string {
   return value;
 }
 
+const accessSecret = required("JWT_ACCESS_SECRET");
+
 export const env = {
   port: Number(process.env.PORT ?? 5000),
   mongoUri: process.env.MONGODB_URI ?? required("MONGO_URI"),
-  accessSecret: required("JWT_ACCESS_SECRET"),
+  accessSecret,
   refreshSecret: required("JWT_REFRESH_SECRET"),
   accessTtl: process.env.ACCESS_TOKEN_TTL ?? "15m",
   refreshTtl: process.env.REFRESH_TOKEN_TTL ?? "30d",
@@ -59,6 +62,18 @@ export const env = {
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean),
+  admin: {
+    /** Admin tokens use their own key so they are never valid as app-user tokens (or the reverse). */
+    jwtSecret:
+      process.env.ADMIN_JWT_SECRET ??
+      crypto.createHash("sha256").update(`${accessSecret}:admin`).digest("hex"),
+    tokenTtl: process.env.ADMIN_TOKEN_TTL ?? "12h",
+    /** First admin login, created only while no admin exists. No password = no admin is created. */
+    initialUsername: (process.env.ADMIN_INITIAL_USERNAME ?? "admin")
+      .trim()
+      .toLowerCase(),
+    initialPassword: process.env.ADMIN_INITIAL_PASSWORD ?? "",
+  },
   mail: {
     host: required("SMTP_HOST"),
     port: Number(process.env.SMTP_PORT ?? 587),

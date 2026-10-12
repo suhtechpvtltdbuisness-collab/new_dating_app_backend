@@ -27,3 +27,17 @@ export function numericQuery(
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
+
+export interface AdminContext {
+  id: string;
+  username: string;
+  role: string;
+}
+
+export function requireAdmin(res: Response): AdminContext {
+  const admin = res.locals.admin as AdminContext | undefined;
+  if (!admin?.id) {
+    throw new AuthError("Missing authenticated admin context", 401);
+  }
+  return admin;
+}
