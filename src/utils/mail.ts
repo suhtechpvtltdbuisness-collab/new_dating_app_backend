@@ -1,9 +1,19 @@
+import dns from "node:dns";
 import nodemailer from "nodemailer";
 import { AuthError } from "../errors/AuthError";
 import { env } from "../config/env";
 
+/** Nodemailer ignores `family` for DNS; force A records so Railway avoids broken IPv6 egress. */
+function ipv4Lookup(
+  hostname: string,
+  _options: unknown,
+  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+): void {
+  dns.lookup(hostname, { family: 4, verbatim: false }, callback);
+}
+
 function getTransporter() {
-  const { host, port, user, pass } = env.mail;
+  const { host, port, user, pass, forceIpv4 } = env.mail;
   const secure = port === 465;
 
   return nodemailer.createTransport({
@@ -11,6 +21,13 @@ function getTransporter() {
     port,
     secure,
     requireTLS: !secure,
+    ...(forceIpv4
+      ? {
+          family: 4,
+          lookup: ipv4Lookup,
+          tls: { servername: host },
+        }
+      : {}),
     auth: {
       user,
       pass,

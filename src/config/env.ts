@@ -80,5 +80,7 @@ export const env = {
     user: required("SMTP_USER"),
     pass: required("SMTP_PASS"),
     from: process.env.SMTP_FROM ?? "Dating App <no-reply@dating-app.local>",
+    /** Railway and similar hosts often lack working IPv6 egress; Hostinger resolves to IPv6 that fails with ENETUNREACH. */
+    forceIpv4: process.env.SMTP_FORCE_IPV4 !== "false",
   },
 };

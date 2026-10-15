@@ -1,6 +1,11 @@
+import dns from "node:dns";
 import app from "./app";
 import { connectDatabase } from "./config/db";
 import { env } from "./config/env";
+
+if (env.mail.forceIpv4) {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 async function bootstrap(): Promise<void> {
   await connectDatabase(env.mongoUri);
