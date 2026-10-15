@@ -44,11 +44,9 @@ npm run dev
 - `REFRESH_TOKEN_TTL`: e.g. `30d`
 - `OTP_TTL_MINUTES`: OTP validity duration
 - `CLIENT_ORIGIN`: allowed CORS origin
-- `SMTP_HOST`: SMTP host for email OTP
-- `SMTP_PORT`: SMTP port, usually `587`
-- `SMTP_USER`: SMTP username
-- `SMTP_PASS`: SMTP password
-- `SMTP_FROM`: sender display/address used for OTP emails
+- `RESEND_API_KEY`: (recommended on Railway) sends OTP mail via HTTPS; when set, SMTP vars are not required
+- `SMTP_FROM`: sender used for OTP emails (must match a domain verified in Resend when using `RESEND_API_KEY`)
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`: SMTP for local dev when `RESEND_API_KEY` is unset
 - `FACE_RECOGNITION_SERVICE_URL`: optional OpenCV face service base URL for selfie verification
 - `FACE_RECOGNITION_SERVICE_KEY`: shared secret sent to the face service
 - `FACE_MATCH_THRESHOLD`: cosine distance threshold; default `0.42`

@@ -3,7 +3,7 @@ import app from "./app";
 import { connectDatabase } from "./config/db";
 import { env } from "./config/env";
 
-if (env.mail.forceIpv4) {
+if (env.mail.provider === "smtp" && env.mail.forceIpv4) {
   dns.setDefaultResultOrder("ipv4first");
 }
 

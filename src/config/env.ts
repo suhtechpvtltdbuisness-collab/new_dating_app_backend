@@ -74,13 +74,41 @@ export const env = {
       .toLowerCase(),
     initialPassword: process.env.ADMIN_INITIAL_PASSWORD ?? "",
   },
-  mail: {
+  mail: buildMailConfig(),
+};
+
+function buildMailConfig():
+  | {
+      provider: "resend";
+      from: string;
+      resendApiKey: string;
+    }
+  | {
+      provider: "smtp";
+      from: string;
+      host: string;
+      port: number;
+      user: string;
+      pass: string;
+      forceIpv4: boolean;
+    } {
+  const from =
+    process.env.SMTP_FROM ??
+    process.env.RESEND_FROM ??
+    "Dating App <no-reply@dating-app.local>";
+  const resendApiKey = process.env.RESEND_API_KEY?.trim() ?? "";
+
+  if (resendApiKey) {
+    return { provider: "resend", from, resendApiKey };
+  }
+
+  return {
+    provider: "smtp",
+    from,
     host: required("SMTP_HOST"),
     port: Number(process.env.SMTP_PORT ?? 587),
     user: required("SMTP_USER"),
     pass: required("SMTP_PASS"),
-    from: process.env.SMTP_FROM ?? "Dating App <no-reply@dating-app.local>",
-    /** Railway and similar hosts often lack working IPv6 egress; Hostinger resolves to IPv6 that fails with ENETUNREACH. */
     forceIpv4: process.env.SMTP_FORCE_IPV4 !== "false",
-  },
-};
+  };
+}
