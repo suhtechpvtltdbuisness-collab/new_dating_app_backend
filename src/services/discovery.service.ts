@@ -4,6 +4,7 @@ import { SwipeModel } from "../models/Swipe";
 import { UserModel } from "../models/User";
 import { presentUser } from "../presenters";
 import { validateObjectId } from "../validation/chat.validation";
+import { canSeeIncognitoUser } from "./incognito.service";
 
 const FEMALE_LABELS = ["female", "women", "woman", "f", "girl"];
 const MALE_LABELS = ["male", "men", "man", "m", "boy"];
@@ -89,6 +90,7 @@ async function baseFilter(userId: string, query: DiscoveryQuery) {
     gender: { $in: genderFilter },
     active: true,
     isHidden: { $ne: true },
+    isIncognito: { $ne: true },
     isBanned: { $ne: true },
     blockedUsers: { $ne: new Types.ObjectId(userId) },
   };
@@ -156,6 +158,14 @@ export async function getProfileById(viewerId: string, profileId: string) {
     user.active === false ||
     user.isBanned ||
     (user.isHidden && String(user._id) !== viewerId)
+  ) {
+    throw new AuthError("Profile not found", 404);
+  }
+
+  if (
+    user.isIncognito &&
+    String(user._id) !== viewerId &&
+    !(await canSeeIncognitoUser(viewerId, String(user._id)))
   ) {
     throw new AuthError("Profile not found", 404);
   }

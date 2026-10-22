@@ -14,6 +14,7 @@ import {
   validateSwipeUserId,
 } from "../validation/swipe.validation";
 import { validateObjectId } from "../validation/chat.validation";
+import { canSeeIncognitoUser } from "./incognito.service";
 
 async function resolveUserSummary(userId: string) {
   const user = await UserModel.findById(userId).lean();
@@ -43,6 +44,12 @@ export async function swipeUser(
 
   const targetUser = await UserModel.findById(validatedTargetUserId).lean();
   if (!targetUser || targetUser.isHidden || targetUser.isBanned) {
+    throw new AuthError("Target user not found", 404);
+  }
+  if (
+    targetUser.isIncognito &&
+    !(await canSeeIncognitoUser(validatedSwiperId, validatedTargetUserId))
+  ) {
     throw new AuthError("Target user not found", 404);
   }
 
@@ -82,27 +89,49 @@ export async function getLikes(userId: string) {
   const validatedUserId = validateObjectId(userId, "userId");
   const likes = await getUserLikes(validatedUserId);
 
-  return Promise.all(
-    likes.map(async (like) => ({
-      ...presentUser(await resolveUserSummary(like.targetUserId.toString())),
-      swipeId: String(like._id),
-      likedAt: like.createdAt,
-      matchedAt: like.matchedAt ?? null,
-    })),
+  const presented = await Promise.all(
+    likes.map(async (like) => {
+      const user = await resolveUserSummary(like.targetUserId.toString());
+      if (
+        user.isIncognito &&
+        !(await canSeeIncognitoUser(validatedUserId, String(user._id)))
+      ) {
+        return null;
+      }
+      return {
+        ...presentUser(user),
+        swipeId: String(like._id),
+        likedAt: like.createdAt,
+        matchedAt: like.matchedAt ?? null,
+      };
+    }),
   );
+
+  return presented.filter((item) => item != null);
 }
 
 export async function getDislikes(userId: string) {
   const validatedUserId = validateObjectId(userId, "userId");
   const dislikes = await getUserDislikes(validatedUserId);
 
-  return Promise.all(
-    dislikes.map(async (dislike) => ({
-      ...presentUser(await resolveUserSummary(dislike.targetUserId.toString())),
-      swipeId: String(dislike._id),
-      dislikedAt: dislike.createdAt,
-    })),
+  const presented = await Promise.all(
+    dislikes.map(async (dislike) => {
+      const user = await resolveUserSummary(dislike.targetUserId.toString());
+      if (
+        user.isIncognito &&
+        !(await canSeeIncognitoUser(validatedUserId, String(user._id)))
+      ) {
+        return null;
+      }
+      return {
+        ...presentUser(user),
+        swipeId: String(dislike._id),
+        dislikedAt: dislike.createdAt,
+      };
+    }),
   );
+
+  return presented.filter((item) => item != null);
 }
 
 function distanceKm(
@@ -172,7 +201,13 @@ export async function getIncomingLikes(userId: string, filter = "all") {
         .filter((like) => !swipedBack.has(like.swiperId.toString()))
         .map(async (like) => {
           const user = await UserModel.findById(like.swiperId).lean();
-          if (!user || user.active === false || user.isHidden || user.isBanned) {
+          if (
+            !user ||
+            user.active === false ||
+            user.isHidden ||
+            user.isBanned ||
+            user.isIncognito
+          ) {
             return null;
           }
           const likedAt = like.createdAt ? new Date(like.createdAt) : null;

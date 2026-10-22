@@ -111,6 +111,8 @@ const userSchema = new Schema(
     },
     active: { type: Boolean, default: true },
     isHidden: { type: Boolean, default: false },
+    // Hibernates the profile: hidden from discovery. Matches and existing chats can still see it.
+    isIncognito: { type: Boolean, default: false, index: true },
     // Set by an admin from the admin panel; unlike `active`/`isHidden` the user cannot change it.
     isBanned: { type: Boolean, default: false, index: true },
     bannedAt: { type: Date },

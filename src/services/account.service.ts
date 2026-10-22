@@ -7,6 +7,7 @@ import {
   validateUpdatePreferencesInput,
   validateUpdateProfileInput,
 } from "../validation/profile.validation";
+import { canSeeIncognitoUser } from "./incognito.service";
 
 async function requireUser(userId: string) {
   const user = await UserModel.findById(validateObjectId(userId, "userId"));
@@ -27,6 +28,13 @@ export async function getUserById(userId: string, viewerId?: string) {
     validateObjectId(userId, "userId"),
   ).lean();
   if (!user || (user.isHidden && String(user._id) !== viewerId)) {
+    throw new AuthError("User not found", 404);
+  }
+  if (
+    user.isIncognito &&
+    String(user._id) !== viewerId &&
+    !(viewerId && (await canSeeIncognitoUser(viewerId, String(user._id))))
+  ) {
     throw new AuthError("User not found", 404);
   }
   return presentUser(user);

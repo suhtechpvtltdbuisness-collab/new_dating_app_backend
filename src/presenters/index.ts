@@ -125,6 +125,7 @@ export function presentUser(user: any) {
     createdAt: user.createdAt,
     active: user.active !== false,
     isHidden: Boolean(user.isHidden),
+    isIncognito: Boolean(user.isIncognito),
   };
 }
 

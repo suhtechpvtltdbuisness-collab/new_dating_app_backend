@@ -14,6 +14,7 @@ import {
   publishMessagesRead,
   publishTyping,
 } from "./realtime.service";
+import { canSeeIncognitoUser } from "./incognito.service";
 
 const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -163,7 +164,9 @@ export async function createConversation(
   }
 
   const recipient = await UserModel.findById(recipientId)
-    .select("name photos isOnline lastActive preferences.showOnline blockedUsers isHidden")
+    .select(
+      "name photos isOnline lastActive preferences.showOnline blockedUsers isHidden isIncognito",
+    )
     .lean();
   if (!recipient) {
     throw new AuthError("Recipient not found", 404);
@@ -177,6 +180,14 @@ export async function createConversation(
   let conversation = await findDirectConversation(validUserId, recipientId);
 
   if (!conversation && recipient.isHidden) {
+    throw new AuthError("This user is not accepting new messages", 403);
+  }
+
+  if (
+    !conversation &&
+    recipient.isIncognito &&
+    !(await canSeeIncognitoUser(validUserId, recipientId))
+  ) {
     throw new AuthError("This user is not accepting new messages", 403);
   }
 
