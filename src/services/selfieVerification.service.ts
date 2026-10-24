@@ -10,6 +10,7 @@ import {
   readPrivateBlob,
   readVolumeFile,
 } from "./media.service";
+import { notifyUser } from "./notification.service";
 
 type ImagePayload = {
   bytes: Buffer;
@@ -293,6 +294,7 @@ export async function verifySelfieAgainstProfilePhotos(
   }
 
   const verified = bestScore <= env.faceMatchThreshold;
+  const wasVerified = user.isVerified === true;
   const now = new Date();
   user.isVerified = verified;
   user.selfieVerification = {
@@ -309,6 +311,15 @@ export async function verifySelfieAgainstProfilePhotos(
   };
 
   await user.save();
+
+  if (verified && !wasVerified) {
+    void notifyUser(String(user._id), {
+      type: "profile",
+      title: "You're verified ✅",
+      body: "Your selfie matched your photos. Your profile now shows the verified badge.",
+      metadata: { action: "verified" },
+    });
+  }
 
   return {
     isVerified: verified,

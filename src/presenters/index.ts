@@ -64,7 +64,11 @@ function presentPhotos(photos: unknown): string[] {
 const ONLINE_WINDOW_MS = 2 * 60 * 1000;
 
 function isUserOnline(user: any): boolean {
-  if (!user?.lastActive || user.preferences?.showOnline === false) return false;
+  if (user?.preferences?.showOnline === false) return false;
+  // `isOnline` is maintained by the WebSocket gateway; the lastActive window
+  // covers clients that only talk REST.
+  if (user?.isOnline === true) return true;
+  if (!user?.lastActive) return false;
   return Date.now() - new Date(user.lastActive).getTime() < ONLINE_WINDOW_MS;
 }
 
@@ -220,7 +224,31 @@ export function presentMatch(swipe: any, currentUserId: string, user: any) {
     acceptedAt: swipe.matchedAt ?? null,
     isNew: Boolean(swipe.matchedAt),
     likeCount: 1,
-    superLikeCount: 0,
+    superLikeCount: swipe.isSuperLike ? 1 : 0,
     matchedUser: presentUser(user),
+  };
+}
+
+export function presentNotification(notification: any) {
+  return {
+    id: toId(notification._id),
+    type: notification.type,
+    title: notification.title,
+    body: notification.body,
+    metadata: notification.metadata ?? {},
+    count: notification.count ?? 1,
+    isRead: Boolean(notification.readAt),
+    readAt: notification.readAt ?? null,
+    createdAt: notification.createdAt,
+  };
+}
+
+/** Small public card of a user, embedded in notifications and socket events. */
+export function presentActor(user: any) {
+  if (!user) return null;
+  return {
+    userId: toId(user._id),
+    name: user.name ?? "",
+    photo: firstPhoto(user),
   };
 }

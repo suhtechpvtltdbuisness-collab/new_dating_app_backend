@@ -8,6 +8,7 @@ import {
   validateUpdateProfileInput,
 } from "../validation/profile.validation";
 import { canSeeIncognitoUser } from "./incognito.service";
+import { CloseCode, disconnectUser } from "./socket.service";
 
 async function requireUser(userId: string) {
   const user = await UserModel.findById(validateObjectId(userId, "userId"));
@@ -69,6 +70,7 @@ export async function deleteUserById(actorId: string, userId: string) {
   if (!deleted) {
     throw new AuthError("User not found", 404);
   }
+  disconnectUser(validUserId, CloseCode.suspended, "account deleted");
 
   return { deleted: true, userId: validUserId };
 }

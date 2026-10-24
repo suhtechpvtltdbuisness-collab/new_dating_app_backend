@@ -15,7 +15,9 @@ export async function rightSwipeHandler(
 ): Promise<void> {
   try {
     const userId = requireUserId(res);
-    const result = await swipeUser(userId, param(req, "userId"), "like");
+    const result = await swipeUser(userId, param(req, "userId"), "like", {
+      superLike: req.body?.superLike === true,
+    });
     res.status(200).json({
       message: result.isMatch ? "Match created" : "Liked",
       data: result,

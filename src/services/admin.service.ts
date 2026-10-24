@@ -17,6 +17,8 @@ import type {
 } from "../validation/admin.validation";
 import { validateObjectId } from "../validation/chat.validation";
 import { logAdminActivity } from "./adminAuth.service";
+import { notifyUser } from "./notification.service";
+import { CloseCode, disconnectUser, emitToUser } from "./socket.service";
 
 const SUMMARY_FIELDS = "name email photos isBanned";
 
@@ -200,6 +202,10 @@ export async function banUser(admin: AdminContext, userId: string) {
     { userId, revokedAt: { $exists: false } },
     { revokedAt: new Date() },
   );
+  emitToUser(userId, "account_suspended", {
+    message: "This account has been suspended",
+  });
+  disconnectUser(userId, CloseCode.suspended, "account suspended");
   return user;
 }
 
@@ -212,8 +218,12 @@ export function unbanUser(admin: AdminContext, userId: string) {
   );
 }
 
-export function verifyUser(admin: AdminContext, userId: string) {
-  return updateUser(
+export async function verifyUser(admin: AdminContext, userId: string) {
+  const wasVerified = await UserModel.exists({
+    _id: validateObjectId(userId, "userId"),
+    isVerified: true,
+  });
+  const user = await updateUser(
     admin,
     userId,
     {
@@ -226,6 +236,15 @@ export function verifyUser(admin: AdminContext, userId: string) {
     },
     "verify_user",
   );
+  if (!wasVerified) {
+    void notifyUser(userId, {
+      type: "profile",
+      title: "You're verified ✅",
+      body: "Your profile now shows the verified badge.",
+      metadata: { action: "verified" },
+    });
+  }
+  return user;
 }
 
 /** Also removes their swipes (so their matches), sessions and the reports against them. */
@@ -244,6 +263,7 @@ export async function deleteUser(admin: AdminContext, userId: string) {
     ReportModel.deleteMany({ reportedUserId: validUserId }),
   ]);
   await logAdminActivity(admin.username, "delete_user", `user#${validUserId}`);
+  disconnectUser(validUserId, CloseCode.suspended, "account deleted");
 
   return { deleted: true, userId: validUserId };
 }
@@ -291,6 +311,19 @@ async function closeReport(
     status === "resolved" ? "resolve_report" : "dismiss_report",
     `report#${validReportId}`,
   );
+
+  const reporterId = (report.reporterId as any)?._id ?? report.reporterId;
+  if (reporterId) {
+    void notifyUser(String(reporterId), {
+      type: "system",
+      title: "Update on your report",
+      body:
+        status === "resolved"
+          ? "Thanks for keeping Vellora safe. We reviewed your report and took action."
+          : "Thanks for your report. We reviewed it and found no violation of our guidelines.",
+      metadata: { reportId: validReportId, status },
+    });
+  }
   return presentAdminReport(report);
 }
 

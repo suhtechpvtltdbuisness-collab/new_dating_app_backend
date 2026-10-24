@@ -1,9 +1,10 @@
 import { AuthError } from "../errors/AuthError";
 import { SwipeModel } from "../models/Swipe";
 import { UserModel } from "../models/User";
-import { presentMatch, presentUser } from "../presenters";
+import { presentActor, presentMatch, presentUser } from "../presenters";
 import {
   findMutualLike,
+  findSwipePair,
   getUserDislikes,
   getUserLikes,
   getUserMatches,
@@ -15,6 +16,8 @@ import {
 } from "../validation/swipe.validation";
 import { validateObjectId } from "../validation/chat.validation";
 import { canSeeIncognitoUser } from "./incognito.service";
+import { notifyUser } from "./notification.service";
+import { emitToUser } from "./socket.service";
 
 async function resolveUserSummary(userId: string) {
   const user = await UserModel.findById(userId).lean();
@@ -26,10 +29,42 @@ async function resolveUserSummary(userId: string) {
   return user;
 }
 
+type MatchSide = { userId: string; swipeId: string; other: any };
+
+/**
+ * Tells both people about a new match; each gets their own match id. The
+ * first side made the swipe that matched and already sees the match screen.
+ */
+function announceMatch(sides: [MatchSide, MatchSide], matchedAt: Date): void {
+  for (const [index, side] of sides.entries()) {
+    const actor = presentActor(side.other);
+    const name = actor?.name || "Someone";
+    void notifyUser(side.userId, {
+      type: "match",
+      title: "It's a match! 🎉",
+      body: `You and ${name} liked each other. Say hi!`,
+      metadata: {
+        matchId: side.swipeId,
+        userId: actor?.userId ?? "",
+        name,
+        photo: actor?.photo ?? "",
+        matchedAt: matchedAt.toISOString(),
+        initiatedByYou: index === 0,
+      },
+    });
+  }
+}
+
+/** Live update for the other person when a match disappears. */
+function announceMatchRemoved(recipientId: string, removedById: string): void {
+  emitToUser(recipientId, "match_removed", { userId: removedById });
+}
+
 export async function swipeUser(
   swiperId: string,
   targetUserId: string,
   action: string,
+  options: { superLike?: boolean } = {},
 ) {
   const validatedSwiperId = validateObjectId(swiperId, "swiperId");
   const validatedTargetUserId = validateSwipeUserId(
@@ -53,20 +88,26 @@ export async function swipeUser(
     throw new AuthError("Target user not found", 404);
   }
 
+  const isLike = validatedAction === "like";
+  const superLike = isLike && options.superLike === true;
+  const previous = await findSwipePair(validatedSwiperId, validatedTargetUserId);
+
   let matchedAt: Date | undefined;
-  if (validatedAction === "like") {
+  let reciprocalSwipeId = "";
+  if (isLike) {
     const reciprocalLike = await findMutualLike(
       validatedSwiperId,
       validatedTargetUserId,
     );
     if (reciprocalLike && reciprocalLike.action === "like") {
       matchedAt = new Date();
-      await upsertSwipe({
+      const reciprocal = await upsertSwipe({
         swiperId: validatedTargetUserId,
         targetUserId: validatedSwiperId,
         action: "like",
         matchedAt,
       });
+      reciprocalSwipeId = String(reciprocal?._id ?? "");
     }
   }
 
@@ -75,7 +116,49 @@ export async function swipeUser(
     targetUserId: validatedTargetUserId,
     action: validatedAction,
     matchedAt,
+    // A later plain like keeps an earlier Super Like; a pass clears it.
+    isSuperLike: isLike ? (superLike || previous?.isSuperLike === true) : false,
   });
+
+  const wasMatched = Boolean(previous?.matchedAt);
+  const isNewLike = isLike && previous?.action !== "like";
+  const isNewSuperLike = superLike && previous?.isSuperLike !== true;
+
+  if (matchedAt && !wasMatched) {
+    const swiper = await UserModel.findById(validatedSwiperId)
+      .select("name photos")
+      .lean();
+    announceMatch(
+      [
+        { userId: validatedSwiperId, swipeId: String(swipe?._id ?? ""), other: targetUser },
+        { userId: validatedTargetUserId, swipeId: reciprocalSwipeId, other: swiper },
+      ],
+      matchedAt,
+    );
+  } else if (!matchedAt && (isNewLike || isNewSuperLike)) {
+    const swiper = await UserModel.findById(validatedSwiperId)
+      .select("name photos isHidden isIncognito isBanned")
+      .lean();
+    // Hidden and incognito profiles are left out of "Liked you", so their
+    // likes stay silent too.
+    if (swiper && !swiper.isHidden && !swiper.isIncognito && !swiper.isBanned) {
+      const actor = presentActor(swiper);
+      const name = actor?.name || "Someone";
+      void notifyUser(validatedTargetUserId, {
+        type: superLike ? "super_like" : "like",
+        title: superLike ? "⭐ Super Like!" : "New like ❤️",
+        body: superLike
+          ? `${name} super liked you. See them in Liked You.`
+          : `${name} liked your profile. Like them back to match!`,
+        metadata: {
+          userId: actor?.userId ?? "",
+          name,
+          photo: actor?.photo ?? "",
+          swipeId: String(swipe?._id ?? ""),
+        },
+      });
+    }
+  }
 
   return {
     isMatch: Boolean(matchedAt),
@@ -216,6 +299,7 @@ export async function getIncomingLikes(userId: string, filter = "all") {
             ...presentUser(user),
             swipeId: String(like._id),
             likedAt,
+            isSuperLike: like.isSuperLike === true,
             distanceKm: km,
             matchScore: matchScore(me, user, km),
             isNew: Boolean(likedAt && likedAt.getTime() >= freshAfter),
@@ -301,6 +385,7 @@ export async function acceptMatch(userId: string, matchId: string) {
     throw new AuthError("The other user has not liked you back yet", 409);
   }
 
+  const wasMatched = Boolean(swipe.matchedAt);
   const matchedAt = swipe.matchedAt ?? new Date();
   swipe.action = "like";
   swipe.matchedAt = matchedAt;
@@ -309,11 +394,21 @@ export async function acceptMatch(userId: string, matchId: string) {
   reciprocal.matchedAt = matchedAt;
   await reciprocal.save();
 
-  return presentMatch(
-    swipe,
-    validatedUserId,
-    await resolveUserSummary(swipe.targetUserId.toString()),
-  );
+  const [other, me] = await Promise.all([
+    resolveUserSummary(swipe.targetUserId.toString()),
+    resolveUserSummary(validatedUserId),
+  ]);
+  if (!wasMatched) {
+    announceMatch(
+      [
+        { userId: validatedUserId, swipeId: String(swipe._id), other },
+        { userId: String(other._id), swipeId: String(reciprocal._id), other: me },
+      ],
+      matchedAt,
+    );
+  }
+
+  return presentMatch(swipe, validatedUserId, other);
 }
 
 export async function rejectMatch(userId: string, matchId: string) {
@@ -328,6 +423,7 @@ export async function rejectMatch(userId: string, matchId: string) {
     { swiperId: swipe.targetUserId, targetUserId: validatedUserId },
     { $unset: { matchedAt: "" } },
   );
+  announceMatchRemoved(String(swipe.targetUserId), validatedUserId);
 
   return { rejected: true, matchId: String(swipe._id) };
 }
@@ -343,6 +439,7 @@ export async function unmatch(userId: string, matchId: string) {
       targetUserId: validatedUserId,
     }),
   ]);
+  announceMatchRemoved(String(swipe.targetUserId), validatedUserId);
 
   return { unmatched: true, matchId: String(swipe._id) };
 }

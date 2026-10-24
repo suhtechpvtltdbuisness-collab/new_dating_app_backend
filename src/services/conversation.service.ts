@@ -7,7 +7,11 @@ import { UserModel } from "../models/User";
 import { presentConversation, presentMessage } from "../presenters";
 import { assertMessageAllowed } from "../utils/contentModeration";
 import { validateObjectId } from "../validation/chat.validation";
-import { createUserNotification } from "./notification.service";
+import {
+  chatCollapseKey,
+  markChatNotificationsRead,
+  notifyUser,
+} from "./notification.service";
 import {
   publishConversationMessage,
   publishMessagesDelivered,
@@ -15,6 +19,7 @@ import {
   publishTyping,
 } from "./realtime.service";
 import { canSeeIncognitoUser } from "./incognito.service";
+import { isUserConnected } from "./socket.service";
 
 const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -256,9 +261,10 @@ async function appendMessage(
   assertMessageAllowed(payload.message);
 
   const recipient = await UserModel.findById(recipientId)
-    .select("isOnline")
+    .select("blockedUsers")
     .lean();
-  const deliveredNow = recipient?.isOnline === true ? new Date() : undefined;
+  // A connected socket receives the message right away, so it is delivered.
+  const deliveredNow = isUserConnected(recipientId) ? new Date() : undefined;
 
   const chat = await ChatModel.create({
     conversationId: conversation._id,
@@ -289,6 +295,8 @@ async function appendMessage(
       ? conversation.participants.map((participant) => String(participant))
       : [senderId, recipientId];
 
+  const senderName = sender?.name?.trim() || "Someone";
+
   void publishConversationMessage({
     conversationId: String(conversation._id),
     participantIds: members,
@@ -296,23 +304,32 @@ async function appendMessage(
     lastMessage: payload.message,
     lastMessageAt: chat.createdAt,
     recipientId,
+    senderId,
+    senderName,
   });
 
-  const senderName = sender?.name?.trim() || "Someone";
-  const preview =
-    payload.message.length > 120
-      ? `${payload.message.slice(0, 117)}...`
-      : payload.message;
-  void createUserNotification(recipientId, {
-    type: "chat",
-    title: `New message from ${senderName}`,
-    body: preview,
-    metadata: {
-      conversationId: String(conversation._id),
-      senderId,
-      messageId: String(chat._id),
-    },
-  }).catch(() => undefined);
+  const recipientBlockedSender = (recipient?.blockedUsers ?? []).some(
+    (id) => String(id) === senderId,
+  );
+  if (!recipientBlockedSender) {
+    const preview =
+      payload.message.length > 120
+        ? `${payload.message.slice(0, 117)}...`
+        : payload.message;
+    void notifyUser(recipientId, {
+      type: "chat",
+      title: senderName,
+      body: preview,
+      collapseKey: chatCollapseKey(String(conversation._id)),
+      metadata: {
+        conversationId: String(conversation._id),
+        senderId,
+        senderName,
+        senderPhoto: presented.senderImage,
+        messageId: String(chat._id),
+      },
+    });
+  }
 
   return { chat, presented };
 }
@@ -345,6 +362,41 @@ async function markIncomingDelivered(
     participantIds: participantIds(conversation),
     messageIds: ids.map((id) => String(id)),
   });
+}
+
+/** Called when a user's device connects: everything waiting for them is now delivered. */
+export async function markAllIncomingDelivered(userId: string): Promise<void> {
+  const pending = await ChatModel.find({
+    recipientId: userId,
+    deliveredAt: { $exists: false },
+    deletedAt: { $exists: false },
+  })
+    .select("_id conversationId senderId")
+    .lean();
+  if (pending.length === 0) return;
+
+  await ChatModel.updateMany(
+    { _id: { $in: pending.map((item) => item._id) } },
+    { $set: { deliveredAt: new Date() } },
+  );
+
+  const byConversation = new Map<string, { ids: string[]; senders: Set<string> }>();
+  for (const item of pending) {
+    const key = String(item.conversationId);
+    const entry = byConversation.get(key) ?? { ids: [], senders: new Set() };
+    entry.ids.push(String(item._id));
+    entry.senders.add(String(item.senderId));
+    byConversation.set(key, entry);
+  }
+
+  for (const [conversationId, entry] of byConversation) {
+    void publishMessagesDelivered({
+      conversationId,
+      userId,
+      participantIds: [userId, ...entry.senders],
+      messageIds: entry.ids,
+    });
+  }
 }
 
 export async function getConversation(
@@ -475,6 +527,7 @@ export async function markConversationRead(userId: string, chatId: string) {
     userId: validUserId,
     participantIds: participantIds(conversation),
   });
+  void markChatNotificationsRead(validUserId, String(conversation._id));
 
   return { chatId: String(conversation._id), unreadCount: 0 };
 }
@@ -486,6 +539,7 @@ export async function notifyTyping(userId: string, chatId: string) {
   void publishTyping({
     conversationId: String(conversation._id),
     userId: validUserId,
+    participantIds: participantIds(conversation),
   });
 
   return { received: true, conversationId: String(conversation._id) };

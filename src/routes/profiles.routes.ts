@@ -5,6 +5,7 @@ import {
   listProfilesHandler,
   nearbyProfilesHandler,
   passProfileHandler,
+  superLikeProfileHandler,
 } from "../controller/discovery.controller";
 import { authenticateAccessToken } from "../middlewares/authenticate";
 
@@ -15,7 +16,7 @@ profilesRouter.use(authenticateAccessToken);
 profilesRouter.get("/", listProfilesHandler);
 profilesRouter.get("/nearby", nearbyProfilesHandler);
 profilesRouter.post("/like", likeProfileHandler);
-profilesRouter.post("/super-like", likeProfileHandler);
+profilesRouter.post("/super-like", superLikeProfileHandler);
 profilesRouter.post("/pass", passProfileHandler);
 profilesRouter.post("/unlike", passProfileHandler);
 profilesRouter.post("/:userId/like", likeProfileHandler);

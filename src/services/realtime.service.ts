@@ -1,4 +1,5 @@
 import { env } from "../config/env";
+import { SOCKET_PATH, emitToUser, emitToUsers } from "./socket.service";
 
 type BroadcastMessage = {
   topic: string;
@@ -46,6 +47,8 @@ export async function publishConversationMessage(params: {
   lastMessage: string;
   lastMessageAt: string | Date;
   recipientId: string;
+  senderId?: string;
+  senderName?: string;
 }): Promise<void> {
   const {
     conversationId,
@@ -54,6 +57,8 @@ export async function publishConversationMessage(params: {
     lastMessage,
     lastMessageAt,
     recipientId,
+    senderId,
+    senderName,
   } = params;
 
   const conversationTopic = `conversation:${conversationId}`;
@@ -67,7 +72,17 @@ export async function publishConversationMessage(params: {
     lastMessage,
     lastMessageAt: lastMessageAtIso,
     message,
+    senderId: senderId ?? "",
+    senderName: senderName ?? "",
   };
+
+  emitToUsers(participantIds, "new_message", message);
+  for (const userId of participantIds) {
+    emitToUser(userId, "conversation_updated", {
+      ...inboxPayload,
+      unreadDelta: userId === recipientId ? 1 : 0,
+    });
+  }
 
   await broadcast([
     {
@@ -89,7 +104,16 @@ export async function publishConversationMessage(params: {
 export async function publishTyping(params: {
   conversationId: string;
   userId: string;
+  participantIds?: string[];
 }): Promise<void> {
+  const others = (params.participantIds ?? []).filter(
+    (id) => id !== params.userId,
+  );
+  emitToUsers(others, "typing", {
+    userId: params.userId,
+    conversationId: params.conversationId,
+  });
+
   await broadcast([
     {
       topic: `conversation:${params.conversationId}`,
@@ -113,6 +137,8 @@ export async function publishMessagesDelivered(params: {
     messageIds: params.messageIds,
   };
 
+  emitToUsers(params.participantIds, "messages_delivered", payload);
+
   await broadcast([
     {
       topic: `conversation:${params.conversationId}`,
@@ -133,6 +159,13 @@ export async function publishMessagesRead(params: {
     unreadCount: 0,
   };
 
+  emitToUsers(params.participantIds, "messages_read", payload);
+  emitToUsers(params.participantIds, "conversation_updated", {
+    conversationId: params.conversationId,
+    readerId: params.userId,
+    unreadCountForReader: 0,
+  });
+
   await broadcast([
     {
       topic: `conversation:${params.conversationId}`,
@@ -152,13 +185,15 @@ export async function publishMessagesRead(params: {
 }
 
 export function realtimePublicConfig() {
+  const websocket = { path: SOCKET_PATH };
   if (!hasValidUrl() || !env.supabaseAnonKey) {
-    return { enabled: false as const };
+    return { enabled: false as const, websocket };
   }
 
   return {
     enabled: true as const,
     url: env.supabaseUrl,
     anonKey: env.supabaseAnonKey,
+    websocket,
   };
 }

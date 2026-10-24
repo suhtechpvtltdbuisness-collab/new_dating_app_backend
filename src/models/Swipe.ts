@@ -21,6 +21,7 @@ const swipeSchema = new Schema(
       index: true,
     },
     matchedAt: { type: Date, index: true },
+    isSuperLike: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

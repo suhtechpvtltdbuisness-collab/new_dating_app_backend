@@ -224,7 +224,7 @@ async function main() {
   const matchId = matches.body?.data?.[0]?.id;
 
   const likedYou = await call("GET", "/swipes/liked-you", { token: aliceToken });
-  check("GET /swipes/liked-you", likedYou.status === 200 && Array.isArray(likedYou.body?.data), likedYou.body);
+  check("GET /swipes/liked-you", likedYou.status === 200 && Array.isArray(likedYou.body?.data?.likes), likedYou.body);
 
   const matchList = await call("GET", "/matches", { token: aliceToken });
   check("GET /matches", matchList.status === 200 && matchList.body?.data?.length === 1, matchList.body);

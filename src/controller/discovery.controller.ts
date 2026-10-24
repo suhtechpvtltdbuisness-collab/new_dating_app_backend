@@ -77,10 +77,31 @@ export async function likeProfileHandler(
 ): Promise<void> {
   try {
     const userId = requireUserId(res);
-    const result = await swipeUser(userId, targetIdFrom(req), "like");
+    const result = await swipeUser(userId, targetIdFrom(req), "like", {
+      superLike: req.body?.superLike === true,
+    });
     res
       .status(200)
       .json({ message: result.isMatch ? "Match created" : "Liked", data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function superLikeProfileHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = requireUserId(res);
+    const result = await swipeUser(userId, targetIdFrom(req), "like", {
+      superLike: true,
+    });
+    res.status(200).json({
+      message: result.isMatch ? "Match created" : "Super liked",
+      data: result,
+    });
   } catch (error) {
     next(error);
   }

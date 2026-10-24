@@ -207,6 +207,68 @@ belonging to a `conversationId`.
 | POST | `/chats/messages/report` | `{ messageId, reason, details? }` |
 | GET | `/chats/recipient/:recipientId`, `/chat-history/:userId`, `/chat-users` | |
 
+## Notifications
+
+Stored in the `notifications` collection and pushed live over the WebSocket
+(below). Unread chat notifications collapse into one per conversation (`count`
+says how many messages it covers) and are marked read when the chat is read.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/notifications` | `?page=&limit=` (default 30, max 100) → `{ notifications, unreadCount, page, limit, total, hasMore }` |
+| GET | `/notifications/unread-count` | `{ unreadCount }` |
+| PATCH | `/notifications/:id/read` | |
+| PATCH | `/notifications/read-all` | |
+| DELETE | `/notifications/:id` | |
+| DELETE | `/notifications` | Clears the caller's list |
+| POST | `/notifications` | `{ type, title, body, metadata? }`; creates one for the caller |
+
+Types and what creates them:
+
+| `type` | Sent when | `metadata` |
+|--------|-----------|------------|
+| `match` | A like completes a match (both people) | `matchId` (the recipient's own), `userId`, `name`, `photo`, `matchedAt`, `initiatedByYou` |
+| `like` / `super_like` | Someone likes you (not when they are hidden or incognito, and only once per person) | `userId`, `name`, `photo`, `swipeId` |
+| `chat` | New message (not if you blocked the sender) | `conversationId`, `senderId`, `senderName`, `senderPhoto`, `messageId` |
+| `profile` | Verified by selfie or by an admin | `action: "verified"` |
+| `system` | An admin resolved or dismissed your report | `reportId`, `status` |
+
+Super Likes: `POST /swipes/right/:userId` with `{ "superLike": true }` or
+`POST /profiles/super-like`. `GET /swipes/liked-you` returns `isSuperLike`.
+
+## Realtime WebSocket
+
+`wss://<host>/ws?token=<access token>` on the API's own port (an
+`Authorization: Bearer` header also works). Frames are JSON
+`{ "event": string, "data": object }` both ways.
+
+Close codes: `4001` the token is invalid or expired (refresh it and
+reconnect); `4003` the account is banned or deleted (sign out).
+
+Server → client:
+
+| Event | Data |
+|-------|------|
+| `connected` | `{ userId, serverTime }` |
+| `notification` | `{ notification, unreadCount }` |
+| `notification_count` | `{ unreadCount }` (sent on connect and whenever it changes) |
+| `new_message` | the message, as in `GET /chats/:id/messages` |
+| `conversation_updated` | `{ conversationId, lastMessage, lastMessageAt, message, senderId, senderName, unreadDelta }`, or `{ conversationId, readerId, unreadCountForReader }` after a read |
+| `typing` | `{ conversationId, userId }` |
+| `messages_delivered` | `{ conversationId, userId, messageIds }` |
+| `messages_read` | `{ conversationId, userId, unreadCount }` |
+| `presence` | `{ userId, isOnline, lastActive }`, sent to chat partners (not when `showOnline` is off) |
+| `match_removed` | `{ userId }`, the person who unmatched or rejected |
+| `account_suspended` | `{ message }`, sent right before a `4003` close |
+| `pong` | reply to `ping` |
+
+Client → server: `ping`, and `typing` with `{ conversationId }`.
+
+Presence is real: `isOnline` is true while the user has at least one socket
+open, and messages to them are marked delivered as soon as they connect.
+Sockets are tracked in memory, so run a single instance (or add a shared
+pub/sub such as Redis before scaling out).
+
 ## Admin Panel
 
 Backs the admin panel in `datingapp-landingpage` (`/admin`). Admins are separate accounts (`admins` collection),
