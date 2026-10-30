@@ -27,6 +27,14 @@ const userSchema = new Schema(
         message: "Invalid email format",
       },
     },
+    // Human-readable support id shown in the app (e.g. USR-00123).
+    publicUserId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
     password: { type: String, select: false },
     googleId: { type: String, unique: true, sparse: true },
     authProvider: {

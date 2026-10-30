@@ -9,6 +9,7 @@ import {
   attachSocketServer,
   closeSocketServer,
 } from "./services/socket.service";
+import { backfillPublicUserIds } from "./utils/publicUserId";
 
 if (env.mail.provider === "smtp" && env.mail.forceIpv4) {
   dns.setDefaultResultOrder("ipv4first");
@@ -19,6 +20,15 @@ async function bootstrap(): Promise<void> {
   await resetPresence().catch((error: unknown) => {
     console.error("Failed to reset presence", error);
   });
+  await backfillPublicUserIds()
+    .then((assigned) => {
+      if (assigned > 0) {
+        console.log(`Assigned publicUserId to ${assigned} existing user(s)`);
+      }
+    })
+    .catch((error: unknown) => {
+      console.error("Failed to backfill publicUserId", error);
+    });
 
   const server = http.createServer(app);
   attachSocketServer(server, socketHooks);

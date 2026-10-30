@@ -2,6 +2,10 @@ import { OtpCodeModel } from "../models/OtpCode";
 import { RefreshTokenModel } from "../models/RefreshToken";
 import { UserModel } from "../models/User";
 import { sha256 } from "../utils/hash";
+import {
+  allocatePublicUserId,
+  syncPublicUserIdCounter,
+} from "../utils/publicUserId";
 import { Types } from "mongoose";
 
 export interface CreateUserInput {
@@ -77,8 +81,10 @@ export function getSuggestedUsers(
     .lean();
 }
 
-export function createUser(input: CreateUserInput) {
-  return UserModel.create(input);
+export async function createUser(input: CreateUserInput) {
+  await syncPublicUserIdCounter();
+  const publicUserId = await allocatePublicUserId();
+  return UserModel.create({ ...input, publicUserId });
 }
 
 export function createOtpRecord(phoneNumber: string, otp: string) {

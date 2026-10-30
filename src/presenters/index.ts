@@ -78,6 +78,7 @@ export function presentUser(user: any) {
   return {
     id: toId(user._id),
     _id: toId(user._id),
+    publicUserId: user.publicUserId ?? "",
     email: user.email ?? "",
     name: user.name ?? "",
     phoneNumber: user.phoneNumber,

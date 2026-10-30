@@ -123,6 +123,7 @@ export async function listUsers(
       { name: pattern },
       { email: pattern },
       { phoneNumber: pattern },
+      { publicUserId: pattern },
     ];
   }
   if (status === "verified") filter.isVerified = true;

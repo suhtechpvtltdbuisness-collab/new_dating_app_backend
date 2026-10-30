@@ -135,6 +135,7 @@ export async function registerWithEmail(
 
   return {
     userId: user._id.toString(),
+    publicUserId: user.publicUserId ?? "",
     email: user.email,
     ...tokens,
   };
@@ -154,7 +155,12 @@ export async function loginWithEmail(payload: LoginInput) {
   }
 
   const tokens = await issueTokens(user._id.toString(), user.phoneNumber);
-  return { userId: user._id.toString(), email: user.email, ...tokens };
+  return {
+    userId: user._id.toString(),
+    publicUserId: user.publicUserId ?? "",
+    email: user.email,
+    ...tokens,
+  };
 }
 
 export async function loginWithGoogle(idToken?: string, accessToken?: string) {
@@ -189,6 +195,7 @@ export async function loginWithGoogle(idToken?: string, accessToken?: string) {
   return {
     isNewUser: false,
     userId: user._id.toString(),
+    publicUserId: user.publicUserId ?? "",
     email: user.email,
     ...tokens,
   };
@@ -215,7 +222,12 @@ export async function loginUser(payload: Partial<LoginRequestInput>) {
   await otpDoc.save();
 
   const tokens = await issueTokens(user._id.toString(), user.phoneNumber);
-  return { userId: user._id.toString(), email: user.email, ...tokens };
+  return {
+    userId: user._id.toString(),
+    publicUserId: user.publicUserId ?? "",
+    email: user.email,
+    ...tokens,
+  };
 }
 
 export async function generateUserOtp(number: string) {

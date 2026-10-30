@@ -1,6 +1,7 @@
 import { AuthError } from "../errors/AuthError";
 import { UserModel } from "../models/User";
 import { presentPreferences, presentUser } from "../presenters";
+import { ensureUserPublicUserId } from "../utils/publicUserId";
 import { deleteBlobIfPresent, extractBlobPathname } from "./media.service";
 import { validateObjectId } from "../validation/chat.validation";
 import {
@@ -37,6 +38,10 @@ export async function getUserById(userId: string, viewerId?: string) {
     !(viewerId && (await canSeeIncognitoUser(viewerId, String(user._id))))
   ) {
     throw new AuthError("User not found", 404);
+  }
+  if (!user.publicUserId) {
+    const publicUserId = await ensureUserPublicUserId(String(user._id));
+    return presentUser({ ...user, publicUserId });
   }
   return presentUser(user);
 }

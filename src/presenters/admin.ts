@@ -35,6 +35,7 @@ export function presentUserSummary(user: any) {
   if (!full) return null;
   return {
     id: full.id,
+    publicUserId: full.publicUserId,
     name: full.name,
     email: full.email,
     photoUrl: full.photoUrl,
