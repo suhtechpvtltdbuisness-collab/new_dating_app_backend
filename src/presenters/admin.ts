@@ -29,8 +29,21 @@ export function presentAdminUser(user: any) {
   };
 }
 
+function toRefId(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "object" && value !== null && "_id" in value) {
+    return String((value as { _id: unknown })._id);
+  }
+  const text = String(value).trim();
+  return text.length ? text : null;
+}
+
 /** Name-and-photo summary for lists; null when the user has been deleted. */
 export function presentUserSummary(user: any) {
+  // Unpopulated ObjectId / bare string is not a user document.
+  if (user == null || typeof user !== "object" || !("name" in user || "email" in user || "photos" in user)) {
+    return null;
+  }
   const full = presentAdminUser(user);
   if (!full) return null;
   return {
@@ -46,6 +59,7 @@ export function presentUserSummary(user: any) {
 /** `open` and `reviewing` both show as "pending" in the admin panel. */
 export function presentAdminReport(report: any) {
   const pending = report.status === "open" || report.status === "reviewing";
+  const reportedUser = presentUserSummary(report.reportedUserId);
   return {
     id: String(report._id),
     reason: report.reason,
@@ -53,7 +67,14 @@ export function presentAdminReport(report: any) {
     status: pending ? "pending" : report.status,
     messageId: report.messageId ? String(report.messageId) : null,
     reporter: presentUserSummary(report.reporterId),
-    reportedUser: presentUserSummary(report.reportedUserId),
+    reportedUser,
+    reportedUserId: reportedUser?.id ?? toRefId(report.reportedUserId),
+    reportedUserName:
+      reportedUser?.name ||
+      (typeof report.reportedUserName === "string"
+        ? report.reportedUserName.trim()
+        : "") ||
+      null,
     createdAt: report.createdAt,
     resolvedAt: report.resolvedAt ?? null,
   };

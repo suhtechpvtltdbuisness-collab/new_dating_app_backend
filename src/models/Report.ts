@@ -9,6 +9,8 @@ const reportSchema = new Schema(
       index: true,
     },
     reportedUserId: { type: Schema.Types.ObjectId, ref: "User" },
+    // Snapshot of the accused user's name at report time (survives account deletion).
+    reportedUserName: { type: String, trim: true, maxlength: 120 },
     messageId: { type: Schema.Types.ObjectId, ref: "Chat" },
     reason: { type: String, required: true, trim: true, maxlength: 200 },
     details: { type: String, trim: true, maxlength: 1000 },

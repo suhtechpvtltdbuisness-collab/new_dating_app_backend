@@ -20,7 +20,7 @@ import { logAdminActivity } from "./adminAuth.service";
 import { notifyUser } from "./notification.service";
 import { CloseCode, disconnectUser, emitToUser } from "./socket.service";
 
-const SUMMARY_FIELDS = "name email photos isBanned";
+const SUMMARY_FIELDS = "name email photos isBanned publicUserId";
 
 // A match is stored as two swipes (one per direction) that both carry `matchedAt`.
 // Keeping the one whose swiper has the lower id counts each match once.

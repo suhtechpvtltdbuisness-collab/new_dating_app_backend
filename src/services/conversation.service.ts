@@ -615,7 +615,12 @@ export async function attachConversationMedia(
 
 export async function reportConversationMessage(
   userId: string,
-  payload: { messageId?: string; reason?: string; details?: string },
+  payload: {
+    messageId?: string;
+    reason?: string;
+    details?: string;
+    reportedUserId?: string;
+  },
 ) {
   const validUserId = validateObjectId(userId, "userId");
   const reason = payload?.reason?.trim();
@@ -628,11 +633,34 @@ export async function reportConversationMessage(
     : undefined;
 
   const message = messageId ? await ChatModel.findById(messageId).lean() : null;
+  if (messageId && !message) {
+    throw new AuthError("Message not found", 404);
+  }
+
+  // Profile/user reports send reportedUserId directly; message reports
+  // can infer the accused user from the message sender.
+  const reportedUserId = payload?.reportedUserId
+    ? validateObjectId(payload.reportedUserId, "reportedUserId")
+    : message?.senderId
+      ? String(message.senderId)
+      : undefined;
+
+  if (!reportedUserId) {
+    throw new AuthError("reportedUserId or messageId is required", 400);
+  }
+
+  const reportedUser = await UserModel.findById(reportedUserId)
+    .select("_id name")
+    .lean();
+  if (!reportedUser) {
+    throw new AuthError("Reported user not found", 404);
+  }
 
   const report = await ReportModel.create({
     reporterId: validUserId,
     messageId,
-    reportedUserId: message?.senderId,
+    reportedUserId,
+    reportedUserName: reportedUser.name ?? "",
     reason,
     details: payload?.details,
   });
