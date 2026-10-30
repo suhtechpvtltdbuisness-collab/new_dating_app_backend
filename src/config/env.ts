@@ -39,6 +39,9 @@ export const env = {
   refreshTtl: process.env.REFRESH_TOKEN_TTL ?? "30d",
   otpTtlMinutes: Number(process.env.OTP_TTL_MINUTES ?? 5),
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:3000",
+  /** Inbox that receives Contact support / Report a problem requests.
+   *  Empty = the address OTP emails are sent from (SMTP_FROM / RESEND_FROM). */
+  supportEmail: (process.env.SUPPORT_EMAIL ?? "").trim(),
   publicBaseUrl: (
     process.env.PUBLIC_BASE_URL ??
     (process.env.RAILWAY_PUBLIC_DOMAIN

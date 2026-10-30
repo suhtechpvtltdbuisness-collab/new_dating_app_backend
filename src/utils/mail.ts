@@ -18,10 +18,29 @@ function otpBodies(otp: string) {
   };
 }
 
-async function sendViaResend(email: string, otp: string): Promise<void> {
+export interface MailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
+export interface MailMessage {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  replyTo?: string;
+  attachments?: MailAttachment[];
+}
+
+const OTP_FAILURE = "Unable to send OTP email right now. Please try again.";
+
+async function sendViaResend(
+  message: MailMessage,
+  failureMessage: string,
+): Promise<void> {
   if (env.mail.provider !== "resend") return;
 
-  const { text, html } = otpBodies(otp);
   let res: Response;
   try {
     res = await fetch("https://api.resend.com/emails", {
@@ -32,18 +51,24 @@ async function sendViaResend(email: string, otp: string): Promise<void> {
       },
       body: JSON.stringify({
         from: env.mail.from,
-        to: [email],
-        subject: OTP_SUBJECT,
-        text,
-        html,
+        to: [message.to],
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+        ...(message.replyTo ? { reply_to: message.replyTo } : {}),
+        ...(message.attachments?.length
+          ? {
+              attachments: message.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content.toString("base64"),
+              })),
+            }
+          : {}),
       }),
     });
   } catch (error) {
     console.error("Resend request failed", { message: (error as Error).message });
-    throw new AuthError(
-      "Unable to send OTP email right now. Please try again.",
-      502,
-    );
+    throw new AuthError(failureMessage, 502);
   }
 
   if (res.ok) return;
@@ -61,10 +86,7 @@ async function sendViaResend(email: string, otp: string): Promise<void> {
     );
   }
 
-  throw new AuthError(
-    "Unable to send OTP email right now. Please try again.",
-    502,
-  );
+  throw new AuthError(failureMessage, 502);
 }
 
 async function smtpConnectAddress(hostname: string): Promise<string> {
@@ -92,7 +114,7 @@ async function smtpConnectAddress(hostname: string): Promise<string> {
       message: (error as Error).message,
     });
     throw new AuthError(
-      "Unable to send OTP email right now. Please try again.",
+      "Unable to send email right now. Please try again.",
       502,
     );
   }
@@ -100,7 +122,7 @@ async function smtpConnectAddress(hostname: string): Promise<string> {
   const address = addresses[0];
   if (!address) {
     throw new AuthError(
-      "Unable to send OTP email right now. Please try again.",
+      "Unable to send email right now. Please try again.",
       502,
     );
   }
@@ -140,17 +162,25 @@ async function createSmtpTransporter(): Promise<{
   return { transporter, hostname: host, connectAddress };
 }
 
-async function sendViaSmtp(email: string, otp: string): Promise<void> {
+async function sendViaSmtp(
+  message: MailMessage,
+  failureMessage: string,
+): Promise<void> {
   const { transporter, hostname, connectAddress } = await createSmtpTransporter();
-  const { text, html } = otpBodies(otp);
 
   try {
     await transporter.sendMail({
       from: env.mail.from,
-      to: email,
-      subject: OTP_SUBJECT,
-      text,
-      html,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+      replyTo: message.replyTo,
+      attachments: message.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
   } catch (error: unknown) {
     const err = error as { code?: string; responseCode?: number; message?: string };
@@ -170,17 +200,29 @@ async function sendViaSmtp(email: string, otp: string): Promise<void> {
       );
     }
 
-    throw new AuthError(
-      "Unable to send OTP email right now. Please try again.",
-      502,
-    );
+    throw new AuthError(failureMessage, 502);
   }
 }
 
-export async function sendOtpMail(email: string, otp: string): Promise<void> {
+/** Sends any email through the configured provider (Resend or SMTP). */
+export async function sendMail(
+  message: MailMessage,
+  failureMessage = "Unable to send email right now. Please try again.",
+): Promise<void> {
   if (env.mail.provider === "resend") {
-    await sendViaResend(email, otp);
+    await sendViaResend(message, failureMessage);
     return;
   }
-  await sendViaSmtp(email, otp);
+  await sendViaSmtp(message, failureMessage);
+}
+
+/** The bare address of the sender, e.g. "reply@suhtech.in" from "App <reply@suhtech.in>". */
+export function senderAddress(): string {
+  const match = env.mail.from.match(/<([^>]+)>/);
+  return (match ? match[1] : env.mail.from).trim();
+}
+
+export async function sendOtpMail(email: string, otp: string): Promise<void> {
+  const { text, html } = otpBodies(otp);
+  await sendMail({ to: email, subject: OTP_SUBJECT, text, html }, OTP_FAILURE);
 }

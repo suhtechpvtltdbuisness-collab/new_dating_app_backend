@@ -17,6 +17,7 @@ import mediaRouter from "./routes/media.routes";
 import notificationRouter from "./routes/notification.routes";
 import profileRouter from "./routes/profile.routes";
 import profilesRouter from "./routes/profiles.routes";
+import supportRouter from "./routes/support.routes";
 import swipeRouter from "./routes/swipe.routes";
 import userRouter from "./routes/user.routes";
 
@@ -124,6 +125,7 @@ app.use(
     "/chat-users",
     "/chat-history",
     "/swipes",
+    "/support",
   ],
   async (_req, _res, next) => {
     try {
@@ -147,6 +149,7 @@ app.use("/notifications", notificationRouter);
 app.use("/chat-users", chatUsersRouter);
 app.use("/chat-history", chatHistoryRouter);
 app.use("/swipes", swipeRouter);
+app.use("/support", supportRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
