@@ -3,13 +3,13 @@ import { UserModel } from "../models/User";
 import { presentPreferences, presentUser } from "../presenters";
 import { ensureUserPublicUserId } from "../utils/publicUserId";
 import { deleteBlobIfPresent, extractBlobPathname } from "./media.service";
+import { purgeUser } from "./accountPurge.service";
 import { validateObjectId } from "../validation/chat.validation";
 import {
   validateUpdatePreferencesInput,
   validateUpdateProfileInput,
 } from "../validation/profile.validation";
 import { canSeeIncognitoUser } from "./incognito.service";
-import { CloseCode, disconnectUser } from "./socket.service";
 
 async function requireUser(userId: string) {
   const user = await UserModel.findById(validateObjectId(userId, "userId"));
@@ -71,11 +71,9 @@ export async function deleteUserById(actorId: string, userId: string) {
   const validUserId = validateObjectId(userId, "userId");
   assertSelf(actorId, validUserId);
 
-  const deleted = await UserModel.findByIdAndDelete(validUserId);
-  if (!deleted) {
+  if (!(await purgeUser(validUserId))) {
     throw new AuthError("User not found", 404);
   }
-  disconnectUser(validUserId, CloseCode.suspended, "account deleted");
 
   return { deleted: true, userId: validUserId };
 }

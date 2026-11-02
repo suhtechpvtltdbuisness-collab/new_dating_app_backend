@@ -17,6 +17,7 @@ import type {
 } from "../validation/admin.validation";
 import { validateObjectId } from "../validation/chat.validation";
 import { logAdminActivity } from "./adminAuth.service";
+import { purgeUser } from "./accountPurge.service";
 import { notifyUser } from "./notification.service";
 import { CloseCode, disconnectUser, emitToUser } from "./socket.service";
 
@@ -248,23 +249,15 @@ export async function verifyUser(admin: AdminContext, userId: string) {
   return user;
 }
 
-/** Also removes their swipes (so their matches), sessions and the reports against them. */
+/** Removes all of the user's data (see purgeUser) plus the reports against them. */
 export async function deleteUser(admin: AdminContext, userId: string) {
   const validUserId = validateObjectId(userId, "userId");
-  const deleted = await UserModel.findByIdAndDelete(validUserId);
-  if (!deleted) {
+  if (!(await purgeUser(validUserId))) {
     throw new AuthError("User not found", 404);
   }
 
-  await Promise.all([
-    SwipeModel.deleteMany({
-      $or: [{ swiperId: validUserId }, { targetUserId: validUserId }],
-    }),
-    RefreshTokenModel.deleteMany({ userId: validUserId }),
-    ReportModel.deleteMany({ reportedUserId: validUserId }),
-  ]);
+  await ReportModel.deleteMany({ reportedUserId: validUserId });
   await logAdminActivity(admin.username, "delete_user", `user#${validUserId}`);
-  disconnectUser(validUserId, CloseCode.suspended, "account deleted");
 
   return { deleted: true, userId: validUserId };
 }
