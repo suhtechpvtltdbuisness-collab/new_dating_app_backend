@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { AuthError } from "../errors/AuthError";
 import { SwipeModel } from "../models/Swipe";
 import { UserModel } from "../models/User";
-import { presentUser } from "../presenters";
+import { presentPublicUser, presentUser } from "../presenters";
 import { validateObjectId } from "../validation/chat.validation";
 import { canSeeIncognitoUser } from "./incognito.service";
 
@@ -115,7 +115,7 @@ export async function listProfiles(userId: string, query: DiscoveryQuery) {
     .limit(limit)
     .lean();
 
-  return users.map(presentUser);
+  return users.map(presentPublicUser);
 }
 
 export async function listNearbyProfiles(
@@ -145,7 +145,7 @@ export async function listNearbyProfiles(
     .limit(limit)
     .lean();
 
-  return users.map(presentUser);
+  return users.map(presentPublicUser);
 }
 
 export async function getProfileById(viewerId: string, profileId: string) {
@@ -174,5 +174,5 @@ export async function getProfileById(viewerId: string, profileId: string) {
     throw new AuthError("Profile not available", 403);
   }
 
-  return presentUser(user);
+  return String(user._id) === viewerId ? presentUser(user) : presentPublicUser(user);
 }

@@ -1,6 +1,6 @@
 import { AuthError } from "../errors/AuthError";
 import { UserModel } from "../models/User";
-import { presentPreferences, presentUser } from "../presenters";
+import { presentPreferences, presentPublicUser, presentUser } from "../presenters";
 import { ensureUserPublicUserId } from "../utils/publicUserId";
 import { deleteBlobIfPresent, extractBlobPathname } from "./media.service";
 import { purgeUser } from "./accountPurge.service";
@@ -39,11 +39,13 @@ export async function getUserById(userId: string, viewerId?: string) {
   ) {
     throw new AuthError("User not found", 404);
   }
+  // Only the owner sees their own email, phone, birth date and exact location.
+  const present = String(user._id) === viewerId ? presentUser : presentPublicUser;
   if (!user.publicUserId) {
     const publicUserId = await ensureUserPublicUserId(String(user._id));
-    return presentUser({ ...user, publicUserId });
+    return present({ ...user, publicUserId });
   }
-  return presentUser(user);
+  return present(user);
 }
 
 export async function updateUserById(
@@ -198,7 +200,7 @@ export async function unblockUser(actorId: string, blockedUserId: string) {
 export async function listBlockedUsers(userId: string) {
   const user = await UserModel.findById(validateObjectId(userId, "userId"))
     .select("blockedUsers")
-    .populate("blockedUsers", "name photos email")
+    .populate("blockedUsers", "name photos")
     .lean();
 
   if (!user) {
@@ -211,6 +213,6 @@ export async function listBlockedUsers(userId: string) {
 
   return {
     blockedUsers: blocked.map((item) => String(item._id ?? item)),
-    users: blocked.map((item) => presentUser(item)),
+    users: blocked.map((item) => presentPublicUser(item)),
   };
 }

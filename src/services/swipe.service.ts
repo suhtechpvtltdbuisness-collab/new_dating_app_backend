@@ -1,7 +1,7 @@
 import { AuthError } from "../errors/AuthError";
 import { SwipeModel } from "../models/Swipe";
 import { UserModel } from "../models/User";
-import { presentActor, presentMatch, presentUser } from "../presenters";
+import { presentActor, presentMatch, presentPublicUser } from "../presenters";
 import {
   findMutualLike,
   findSwipePair,
@@ -182,7 +182,7 @@ export async function getLikes(userId: string) {
         return null;
       }
       return {
-        ...presentUser(user),
+        ...presentPublicUser(user),
         swipeId: String(like._id),
         likedAt: like.createdAt,
         matchedAt: like.matchedAt ?? null,
@@ -207,7 +207,7 @@ export async function getDislikes(userId: string) {
         return null;
       }
       return {
-        ...presentUser(user),
+        ...presentPublicUser(user),
         swipeId: String(dislike._id),
         dislikedAt: dislike.createdAt,
       };
@@ -296,7 +296,7 @@ export async function getIncomingLikes(userId: string, filter = "all") {
           const likedAt = like.createdAt ? new Date(like.createdAt) : null;
           const km = distanceKm(me?.location, user.location);
           return {
-            ...presentUser(user),
+            ...presentPublicUser(user),
             swipeId: String(like._id),
             likedAt,
             isSuperLike: like.isSuperLike === true,

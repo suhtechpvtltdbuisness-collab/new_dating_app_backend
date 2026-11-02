@@ -134,6 +134,66 @@ export function presentUser(user: any) {
   };
 }
 
+function ageOn(dob: unknown, now: Date): number | null {
+  if (!dob) return null;
+  const birth = new Date(dob as string);
+  if (Number.isNaN(birth.getTime())) return null;
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
+  const hadBirthday =
+    now.getUTCMonth() > birth.getUTCMonth() ||
+    (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() >= birth.getUTCDate());
+  if (!hadBirthday) age -= 1;
+  return Math.max(age, 0);
+}
+
+/** ~1.1 km precision: enough for "X km away", not enough to find someone's home. */
+function coarseLocation(location: any) {
+  const coords = location?.coordinates;
+  if (!Array.isArray(coords) || coords.length !== 2) return undefined;
+  const round = (n: unknown) => Math.round(Number(n) * 100) / 100;
+  return { type: "Point", coordinates: [round(coords[0]), round(coords[1])] };
+}
+
+/**
+ * Another member's profile as other users may see it. Never includes email, phone,
+ * real date of birth, exact location or verification internals.
+ *
+ * Older app versions compute age from `dob` and distance from `location`, so `dob`
+ * is replaced by a date that yields the same age today, and `location` is rounded.
+ */
+export function presentPublicUser(user: any) {
+  const full = presentUser(user);
+  if (!full) return null;
+  const {
+    email: _email,
+    phoneNumber: _phone,
+    dob: _dob,
+    dateOfBirth: _dateOfBirth,
+    location: _location,
+    selfieVerification,
+    ...rest
+  } = full;
+
+  const now = new Date();
+  const age = ageOn(user.dob, now);
+  const ageDate =
+    age === null
+      ? undefined
+      : new Date(Date.UTC(now.getUTCFullYear() - age, now.getUTCMonth(), now.getUTCDate()));
+
+  return {
+    ...rest,
+    age,
+    dob: ageDate,
+    dateOfBirth: ageDate,
+    location: coarseLocation(user.location),
+    selfieVerification: {
+      status: selfieVerification.status,
+      verifiedAt: selfieVerification.verifiedAt,
+    },
+  };
+}
+
 export function presentPreferences(user: any) {
   const prefs = user?.preferences ?? {};
   const lookingFor = (prefs.lookingFor ?? []).filter((item: string) =>
@@ -226,7 +286,7 @@ export function presentMatch(swipe: any, currentUserId: string, user: any) {
     isNew: Boolean(swipe.matchedAt),
     likeCount: 1,
     superLikeCount: swipe.isSuperLike ? 1 : 0,
-    matchedUser: presentUser(user),
+    matchedUser: presentPublicUser(user),
   };
 }
 
