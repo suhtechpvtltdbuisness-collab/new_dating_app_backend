@@ -57,7 +57,7 @@ export const env = {
     process.env.FACE_RECOGNITION_SERVICE_URL ?? ""
   ).replace(/\/$/, ""),
   faceRecognitionServiceKey: process.env.FACE_RECOGNITION_SERVICE_KEY ?? "",
-  faceMatchThreshold: Number(process.env.FACE_MATCH_THRESHOLD ?? 0.42),
+  faceMatchThreshold: Number(process.env.FACE_MATCH_THRESHOLD ?? 0.6),
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",

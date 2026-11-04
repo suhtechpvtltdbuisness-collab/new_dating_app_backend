@@ -24,7 +24,7 @@ environment with:
 ```env
 FACE_RECOGNITION_SERVICE_URL=https://your-face-service.up.railway.app
 FACE_RECOGNITION_SERVICE_KEY=use-the-same-secret
-FACE_MATCH_THRESHOLD=0.42
+FACE_MATCH_THRESHOLD=0.6
 ```
 
 ## Local run

@@ -14,6 +14,7 @@ DATA_URL = re.compile(r"^data:image/(?:jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]
 DETECTOR_MODEL = os.getenv("FACE_DETECTOR_MODEL", "/app/models/face_detection_yunet.onnx")
 RECOGNIZER_MODEL = os.getenv("FACE_RECOGNIZER_MODEL", "/app/models/face_recognition_sface.onnx")
 SERVICE_KEY = os.getenv("FACE_RECOGNITION_SERVICE_KEY", "")
+DETECT_MAX_SIDE = int(os.getenv("FACE_DETECT_MAX_SIDE", "640"))
 
 detector = None
 recognizer = None
@@ -43,14 +44,34 @@ def decode_image(data_url: str) -> np.ndarray:
     return image
 
 
+def fit_for_detection(image: np.ndarray) -> np.ndarray:
+    # YuNet misses or misplaces faces that fill a large photo (a close-up selfie at 1600px
+    # often returns no face). Faces are cropped to 112x112 anyway, so shrinking loses nothing.
+    height, width = image.shape[:2]
+    scale = DETECT_MAX_SIDE / max(height, width)
+    if scale >= 1:
+        return image
+    return cv2.resize(image, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA)
+
+
+def pick_face(faces) -> np.ndarray:
+    if faces is None or len(faces) == 0:
+        api_error(422, "No face found. Use a clear, well-lit photo of your face.", "NO_FACE")
+    if len(faces) == 1:
+        return faces[0]
+    # Allow a small face in the background (a poster, someone far behind) when one face clearly dominates.
+    by_area = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+    if by_area[0][2] * by_area[0][3] >= 2.5 * by_area[1][2] * by_area[1][3]:
+        return by_area[0]
+    api_error(422, "More than one face found. Make sure only you are in the photo.", "SINGLE_FACE_REQUIRED")
+
+
 def create_embedding(image: np.ndarray) -> list[float]:
+    image = fit_for_detection(image)
     height, width = image.shape[:2]
     detector.setInputSize((width, height))
     _, faces = detector.detect(image)
-    count = 0 if faces is None else len(faces)
-    if count != 1:
-        api_error(422, "Exactly one clearly visible face is required", "SINGLE_FACE_REQUIRED")
-    aligned = recognizer.alignCrop(image, faces[0])
+    aligned = recognizer.alignCrop(image, pick_face(faces))
     feature = recognizer.feature(aligned).flatten().astype(np.float64)
     norm = np.linalg.norm(feature)
     if not np.isfinite(norm) or norm == 0:

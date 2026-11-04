@@ -49,7 +49,7 @@ npm run dev
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`: SMTP for local dev when `RESEND_API_KEY` is unset
 - `FACE_RECOGNITION_SERVICE_URL`: optional OpenCV face service base URL for selfie verification
 - `FACE_RECOGNITION_SERVICE_KEY`: shared secret sent to the face service
-- `FACE_MATCH_THRESHOLD`: cosine distance threshold; default `0.42`
+- `FACE_MATCH_THRESHOLD`: cosine distance threshold; default `0.6` (OpenCV recommends 0.637 for SFace; lower is stricter)
 - `ADMIN_INITIAL_USERNAME`: first admin panel login, default `admin`
 - `ADMIN_INITIAL_PASSWORD`: its password. The admin is created on the first sign-in attempt while no admin exists; if this is unset no admin is created
 - `ADMIN_JWT_SECRET`: optional signing key for admin tokens; derived from `JWT_ACCESS_SECRET` when unset
