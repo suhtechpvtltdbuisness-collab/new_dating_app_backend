@@ -18,6 +18,13 @@ import {
   adminUserDetailHandler,
   adminVerifyUserHandler,
 } from "../controller/admin.controller";
+import {
+  adminCreatePlanHandler,
+  adminDeletePlanHandler,
+  adminListPlansHandler,
+  adminTogglePlanHandler,
+  adminUpdatePlanHandler,
+} from "../controller/plan.controller";
 import { authenticateAdmin } from "../middlewares/authenticateAdmin";
 
 const adminRouter = Router();
@@ -46,5 +53,12 @@ adminRouter.post("/reports/:id/resolve", adminResolveReportHandler);
 adminRouter.post("/reports/:id/dismiss", adminDismissReportHandler);
 
 adminRouter.get("/matches", adminListMatchesHandler);
+
+adminRouter.get("/plans", adminListPlansHandler);
+adminRouter.post("/plans", adminCreatePlanHandler);
+adminRouter.put("/plans/:id", adminUpdatePlanHandler);
+adminRouter.post("/plans/:id", adminUpdatePlanHandler);
+adminRouter.post("/plans/:id/toggle", adminTogglePlanHandler);
+adminRouter.delete("/plans/:id", adminDeletePlanHandler);
 
 export default adminRouter;

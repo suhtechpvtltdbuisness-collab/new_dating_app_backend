@@ -26,6 +26,9 @@ const reportSchema = new Schema(
   { timestamps: true },
 );
 
+reportSchema.index({ status: 1, createdAt: -1 });
+reportSchema.index({ createdAt: -1 });
+
 export type ReportDocument = InferSchemaType<typeof reportSchema> & {
   _id: Types.ObjectId;
 };

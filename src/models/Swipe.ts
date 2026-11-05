@@ -27,6 +27,8 @@ const swipeSchema = new Schema(
 );
 
 swipeSchema.index({ swiperId: 1, targetUserId: 1 }, { unique: true });
+swipeSchema.index({ matchedAt: -1, swiperId: 1, targetUserId: 1 });
+swipeSchema.index({ matchedAt: 1 });
 
 export type SwipeDocument = InferSchemaType<typeof swipeSchema> & {
   _id: Types.ObjectId;
