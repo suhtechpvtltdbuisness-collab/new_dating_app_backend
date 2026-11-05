@@ -130,6 +130,9 @@ const userSchema = new Schema(
 );
 
 userSchema.index({ location: "2dsphere" });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ isVerified: 1, createdAt: -1 });
+userSchema.index({ isBanned: 1, createdAt: -1 });
 
 export type UserDocument = InferSchemaType<typeof userSchema> & { _id: string };
 

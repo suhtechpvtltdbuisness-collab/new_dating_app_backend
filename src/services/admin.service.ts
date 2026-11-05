@@ -119,16 +119,32 @@ export async function listUsers(
 
   const filter: Record<string, unknown> = {};
   if (q) {
-    const pattern = new RegExp(escapeRegex(q), "i");
-    filter.$or = [
-      { name: pattern },
-      { email: pattern },
-      { phoneNumber: pattern },
-      { publicUserId: pattern },
-    ];
+    const rawQ = q.trim();
+    // 🧠 Smart Search: Detect intent by input shape
+    if (/^USR-?\d+/i.test(rawQ)) {
+      // Direct prefix lookup for public user IDs (e.g. USR-00053)
+      filter.publicUserId = new RegExp(`^${escapeRegex(rawQ)}`, "i");
+    } else if (rawQ.includes("@")) {
+      // Direct lookup for emails
+      filter.email = new RegExp(escapeRegex(rawQ), "i");
+    } else if (/^\+?\d{4,}$/.test(rawQ)) {
+      // Direct lookup for phone numbers
+      filter.phoneNumber = new RegExp(escapeRegex(rawQ));
+    } else {
+      // Multi-field smart match across name, email, phone, public ID
+      const pattern = new RegExp(escapeRegex(rawQ), "i");
+      filter.$or = [
+        { name: pattern },
+        { email: pattern },
+        { phoneNumber: pattern },
+        { publicUserId: pattern },
+      ];
+    }
   }
   if (status === "verified") filter.isVerified = true;
   else if (status === "banned") filter.isBanned = true;
+
+  const isUnfiltered = Object.keys(filter).length === 0;
 
   const [users, total] = await Promise.all([
     UserModel.find(filter)
@@ -136,7 +152,9 @@ export async function listUsers(
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean(),
-    UserModel.countDocuments(filter),
+    isUnfiltered
+      ? UserModel.estimatedDocumentCount()
+      : UserModel.countDocuments(filter),
   ]);
 
   return {
