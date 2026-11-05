@@ -60,13 +60,15 @@ export function presentUserSummary(user: any) {
 export function presentAdminReport(report: any) {
   const pending = report.status === "open" || report.status === "reviewing";
   const reportedUser = presentUserSummary(report.reportedUserId);
+  const reporter = presentUserSummary(report.reporterId);
   return {
     id: String(report._id),
     reason: report.reason,
     details: report.details ?? "",
     status: pending ? "pending" : report.status,
     messageId: report.messageId ? String(report.messageId) : null,
-    reporter: presentUserSummary(report.reporterId),
+    reporter,
+    reporterId: reporter?.id ?? toRefId(report.reporterId),
     reportedUser,
     reportedUserId: reportedUser?.id ?? toRefId(report.reportedUserId),
     reportedUserName:
