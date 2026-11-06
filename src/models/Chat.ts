@@ -19,19 +19,29 @@ const chatSchema = new Schema(
       ref: "Conversation",
       index: true,
     },
-    message: { type: String, required: true, trim: true, maxlength: 2000 },
+    // Empty for a photo-only message.
+    message: { type: String, default: "", trim: true, maxlength: 2000 },
     attachmentUrl: { type: String },
     attachmentType: { type: String, enum: ["image", "video", "document"] },
     editedAt: { type: Date },
     deletedAt: { type: Date },
     deliveredAt: { type: Date },
     readAt: { type: Date },
+    // Set by the sending device so a retried send is stored only once.
+    clientMessageId: { type: String },
   },
   { timestamps: true },
 );
 
 chatSchema.index({ senderId: 1, recipientId: 1, createdAt: -1 });
 chatSchema.index({ conversationId: 1, createdAt: -1 });
+chatSchema.index(
+  { senderId: 1, clientMessageId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientMessageId: { $type: "string" } },
+  },
+);
 
 export type ChatDocument = InferSchemaType<typeof chatSchema> & {
   _id: Types.ObjectId;

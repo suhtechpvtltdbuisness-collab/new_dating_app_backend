@@ -15,6 +15,7 @@ import {
   validateSwipeUserId,
 } from "../validation/swipe.validation";
 import { validateObjectId } from "../validation/chat.validation";
+import { announceConversationClosed } from "./chatAccess.service";
 import { canSeeIncognitoUser } from "./incognito.service";
 import { notifyUser } from "./notification.service";
 import { emitToUser } from "./socket.service";
@@ -58,6 +59,10 @@ function announceMatch(sides: [MatchSide, MatchSide], matchedAt: Date): void {
 /** Live update for the other person when a match disappears. */
 function announceMatchRemoved(recipientId: string, removedById: string): void {
   emitToUser(recipientId, "match_removed", { userId: removedById });
+  // Their chat is closed too; both apps drop it live.
+  announceConversationClosed(recipientId, removedById).catch((error) =>
+    console.error("Announcing closed conversation failed", error),
+  );
 }
 
 export async function swipeUser(
@@ -123,6 +128,11 @@ export async function swipeUser(
   const wasMatched = Boolean(previous?.matchedAt);
   const isNewLike = isLike && previous?.action !== "like";
   const isNewSuperLike = superLike && previous?.isSuperLike !== true;
+
+  if (wasMatched && !isLike) {
+    // Swiping left on a match ends it.
+    announceMatchRemoved(validatedTargetUserId, validatedSwiperId);
+  }
 
   if (matchedAt && !wasMatched) {
     const swiper = await UserModel.findById(validatedSwiperId)

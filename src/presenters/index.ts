@@ -242,6 +242,7 @@ export function presentMessage(chat: any, sender?: any) {
       ? presentPhoto(String(chat.attachmentUrl))
       : null,
     attachmentType: chat.attachmentType ?? null,
+    clientId: chat.clientMessageId ?? null,
   };
 }
 

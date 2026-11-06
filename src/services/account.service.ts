@@ -10,6 +10,7 @@ import {
   validateUpdateProfileInput,
 } from "../validation/profile.validation";
 import { canSeeIncognitoUser } from "./incognito.service";
+import { announceConversationClosed } from "./chatAccess.service";
 
 async function requireUser(userId: string) {
   const user = await UserModel.findById(validateObjectId(userId, "userId"));
@@ -175,6 +176,11 @@ export async function blockUser(actorId: string, blockedUserId: string) {
   if (!user) {
     throw new AuthError("User not found", 404);
   }
+
+  // Blocking ends the chat for both people straight away.
+  announceConversationClosed(String(user._id), validBlockedId).catch((error) =>
+    console.error("Announcing closed conversation failed", error),
+  );
 
   return { blockedUsers: (user.blockedUsers ?? []).map(String) };
 }

@@ -114,6 +114,7 @@ export async function listMessagesHandler(
       param(req, "chatId"),
       numericQuery(req, "page") ?? 1,
       numericQuery(req, "limit") ?? 50,
+      typeof req.query.after === "string" ? req.query.after : undefined,
     );
     res.status(200).json({ data: result });
   } catch (error) {

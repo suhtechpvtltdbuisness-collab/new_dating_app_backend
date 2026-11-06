@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { AuthError } from "../errors/AuthError";
 import { ChatModel } from "../models/Chat";
+import { MediaModel } from "../models/Media";
 import { ConversationModel } from "../models/Conversation";
 import { ReportModel } from "../models/Report";
 import { UserModel } from "../models/User";
@@ -18,11 +19,17 @@ import {
   publishMessagesRead,
   publishTyping,
 } from "./realtime.service";
+import { canChat, chatPartnerIds } from "./chatAccess.service";
 import { canSeeIncognitoUser } from "./incognito.service";
+import { extractBlobPathname } from "./media.service";
 import { isUserConnected } from "./socket.service";
 
 const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LENGTH = 2000;
+const MAX_CATCH_UP_MESSAGES = 200;
+const PHOTO_PREVIEW = "📷 Photo";
+const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const CANNOT_CHAT_MESSAGE = "You can't message this person anymore";
 
 function clamp(value: unknown, fallback: number, max: number): number {
   const parsed = Number(value);
@@ -58,6 +65,18 @@ async function requireConversation(userId: string, chatId: string) {
     throw new AuthError("Chat not found", 404);
   }
 
+  return conversation;
+}
+
+/**
+ * A conversation the user can still use: the two are matched and neither
+ * has blocked the other. Unmatched or blocked chats behave as gone.
+ */
+async function requireActiveConversation(userId: string, chatId: string) {
+  const conversation = await requireConversation(userId, chatId);
+  if (!(await canChat(userId, otherParticipantId(conversation, userId)))) {
+    throw new AuthError(CANNOT_CHAT_MESSAGE, 403);
+  }
   return conversation;
 }
 
@@ -110,8 +129,11 @@ export async function listConversations(
   const safeLimit = clamp(limit, 20, 100);
   const safePage = clamp(page, 1, 1000);
 
+  const partners = await chatPartnerIds(validUserId);
+  if (partners.length === 0) return [];
+
   const conversations = await ConversationModel.find({
-    participants: validUserId,
+    $and: [{ participants: validUserId }, { participants: { $in: partners } }],
     deletedFor: { $ne: new Types.ObjectId(validUserId) },
   })
     .sort({ lastMessageAt: -1 })
@@ -179,6 +201,10 @@ export async function createConversation(
 
   if ((recipient.blockedUsers ?? []).some((id) => String(id) === validUserId)) {
     throw new AuthError("You cannot message this user", 403);
+  }
+
+  if (!(await canChat(validUserId, recipientId))) {
+    throw new AuthError("You can chat once you both like each other", 403);
   }
 
   const pairKey = makePairKey(validUserId, recipientId);
@@ -256,9 +282,11 @@ async function appendMessage(
     message: string;
     attachmentUrl?: string;
     attachmentType?: string;
+    clientMessageId?: string;
   },
 ) {
-  assertMessageAllowed(payload.message);
+  if (payload.message) assertMessageAllowed(payload.message);
+  const preview = payload.message || (payload.attachmentUrl ? PHOTO_PREVIEW : "");
 
   const recipient = await UserModel.findById(recipientId)
     .select("blockedUsers")
@@ -273,6 +301,9 @@ async function appendMessage(
     message: payload.message,
     attachmentUrl: payload.attachmentUrl,
     attachmentType: payload.attachmentType,
+    ...(payload.clientMessageId
+      ? { clientMessageId: payload.clientMessageId }
+      : {}),
     ...(deliveredNow ? { deliveredAt: deliveredNow } : {}),
   });
 
@@ -280,7 +311,7 @@ async function appendMessage(
     { _id: conversation._id },
     {
       $set: {
-        lastMessage: payload.message,
+        lastMessage: preview,
         lastMessageAt: chat.createdAt,
       },
       $inc: { [`unread.${recipientId}`]: 1 },
@@ -301,7 +332,7 @@ async function appendMessage(
     conversationId: String(conversation._id),
     participantIds: members,
     message: presented,
-    lastMessage: payload.message,
+    lastMessage: preview,
     lastMessageAt: chat.createdAt,
     recipientId,
     senderId,
@@ -312,14 +343,12 @@ async function appendMessage(
     (id) => String(id) === senderId,
   );
   if (!recipientBlockedSender) {
-    const preview =
-      payload.message.length > 120
-        ? `${payload.message.slice(0, 117)}...`
-        : payload.message;
+    const body =
+      preview.length > 120 ? `${preview.slice(0, 117)}...` : preview;
     void notifyUser(recipientId, {
       type: "chat",
       title: senderName,
-      body: preview,
+      body,
       collapseKey: chatCollapseKey(String(conversation._id)),
       metadata: {
         conversationId: String(conversation._id),
@@ -406,7 +435,7 @@ export async function getConversation(
   limit = DEFAULT_MESSAGE_LIMIT,
 ) {
   const validUserId = validateObjectId(userId, "userId");
-  const conversation = await requireConversation(validUserId, chatId);
+  const conversation = await requireActiveConversation(validUserId, chatId);
   const otherId = otherParticipantId(conversation, validUserId);
 
   await markIncomingDelivered(validUserId, conversation);
@@ -433,15 +462,92 @@ export async function listConversationMessages(
   chatId: string,
   page = 1,
   limit = DEFAULT_MESSAGE_LIMIT,
+  afterMessageId?: string,
 ) {
   const validUserId = validateObjectId(userId, "userId");
-  const conversation = await requireConversation(validUserId, chatId);
-  const safePage = clamp(page, 1, 1000);
-  const safeLimit = clamp(limit, DEFAULT_MESSAGE_LIMIT, 200);
+  const conversation = await requireActiveConversation(validUserId, chatId);
 
   await markIncomingDelivered(validUserId, conversation);
 
+  if (afterMessageId) {
+    return loadMessagesAfter(conversation._id, afterMessageId);
+  }
+
+  const safePage = clamp(page, 1, 1000);
+  const safeLimit = clamp(limit, DEFAULT_MESSAGE_LIMIT, 200);
   return loadMessages(conversation._id, safePage, safeLimit);
+}
+
+/**
+ * Messages newer than `afterMessageId`, oldest first — lets a client that
+ * was offline catch up from the last message it has.
+ */
+async function loadMessagesAfter(
+  conversationId: Types.ObjectId,
+  afterMessageId: string,
+) {
+  const anchor = await ChatModel.findOne({
+    _id: validateObjectId(afterMessageId, "after"),
+    conversationId,
+  })
+    .select("createdAt")
+    .lean();
+  if (!anchor) {
+    // Unknown or deleted anchor: fall back to the latest page.
+    return loadMessages(conversationId, 1, DEFAULT_MESSAGE_LIMIT);
+  }
+
+  const messages = await ChatModel.find({
+    conversationId,
+    deletedAt: { $exists: false },
+    $or: [
+      { createdAt: { $gt: anchor.createdAt } },
+      { createdAt: anchor.createdAt, _id: { $gt: anchor._id } },
+    ],
+  })
+    .sort({ createdAt: 1, _id: 1 })
+    .limit(MAX_CATCH_UP_MESSAGES + 1)
+    .lean();
+
+  const hasMore = messages.length > MAX_CATCH_UP_MESSAGES;
+  const page = hasMore ? messages.slice(0, MAX_CATCH_UP_MESSAGES) : messages;
+
+  const senderIds = [...new Set(page.map((item) => String(item.senderId)))];
+  const senders = await UserModel.find({ _id: { $in: senderIds } })
+    .select("name photos")
+    .lean();
+  const senderById = new Map(senders.map((user) => [String(user._id), user]));
+
+  return {
+    messages: page.map((message) =>
+      presentMessage(message, senderById.get(String(message.senderId))),
+    ),
+    page: 1,
+    limit: MAX_CATCH_UP_MESSAGES,
+    total: page.length,
+    // True when more than MAX_CATCH_UP_MESSAGES arrived: reload from page 1.
+    hasMore,
+  };
+}
+
+/** Only photos the sender uploaded through our own media endpoints. */
+async function assertOwnPhoto(senderId: string, attachmentUrl: string) {
+  const pathname = extractBlobPathname(attachmentUrl);
+  if (
+    pathname &&
+    !pathname.includes("..") &&
+    pathname.startsWith(`profiles/${senderId}/`)
+  ) {
+    return;
+  }
+
+  const mediaId = attachmentUrl.match(/\/media\/([a-f0-9]{24})(?:[?#].*)?$/i)?.[1];
+  if (mediaId) {
+    const media = await MediaModel.findById(mediaId).select("ownerId").lean();
+    if (media && String(media.ownerId) === senderId) return;
+  }
+
+  throw new AuthError("Invalid attachment", 400);
 }
 
 export async function sendConversationMessage(
@@ -451,14 +557,36 @@ export async function sendConversationMessage(
     message?: string;
     attachmentUrl?: string;
     attachmentType?: string;
+    clientId?: string;
   },
 ) {
   const validUserId = validateObjectId(userId, "userId");
-  const conversation = await requireConversation(validUserId, chatId);
+  const conversation = await requireActiveConversation(validUserId, chatId);
 
-  const message = payload?.message?.trim();
-  if (!message) {
+  const message =
+    typeof payload?.message === "string" ? payload.message.trim() : "";
+  const attachmentUrl =
+    typeof payload?.attachmentUrl === "string"
+      ? payload.attachmentUrl.trim()
+      : "";
+  if (!message && !attachmentUrl) {
     throw new AuthError("message is required", 400);
+  }
+  if (attachmentUrl) {
+    if ((payload.attachmentType ?? "image") !== "image") {
+      throw new AuthError("Only photos can be attached", 400);
+    }
+    await assertOwnPhoto(validUserId, attachmentUrl);
+  }
+
+  const clientId =
+    typeof payload?.clientId === "string" && CLIENT_ID_PATTERN.test(payload.clientId)
+      ? payload.clientId
+      : undefined;
+  if (clientId) {
+    // A retried send (socket timeout, then REST) returns the stored message.
+    const existing = await findByClientId(validUserId, clientId);
+    if (existing) return existing;
   }
 
   if (message.length > MAX_MESSAGE_LENGTH) {
@@ -473,23 +601,39 @@ export async function sendConversationMessage(
   }
 
   const recipientId = otherParticipantId(conversation, validUserId);
-  const { presented } = await appendMessage(
-    conversation,
-    validUserId,
-    recipientId,
-    {
-      message,
-      attachmentUrl: payload.attachmentUrl,
-      attachmentType: payload.attachmentType,
-    },
-  );
+  try {
+    const { presented } = await appendMessage(
+      conversation,
+      validUserId,
+      recipientId,
+      {
+        message,
+        attachmentUrl: attachmentUrl || undefined,
+        attachmentType: attachmentUrl ? "image" : undefined,
+        clientMessageId: clientId,
+      },
+    );
+    return presented;
+  } catch (error: any) {
+    // Two copies of the same send raced; the first one won.
+    if (clientId && error?.code === 11000) {
+      const existing = await findByClientId(validUserId, clientId);
+      if (existing) return existing;
+    }
+    throw error;
+  }
+}
 
-  return presented;
+async function findByClientId(senderId: string, clientMessageId: string) {
+  const chat = await ChatModel.findOne({ senderId, clientMessageId }).lean();
+  if (!chat) return null;
+  const sender = await UserModel.findById(senderId).select("name photos").lean();
+  return presentMessage(chat, sender);
 }
 
 export async function markConversationRead(userId: string, chatId: string) {
   const validUserId = validateObjectId(userId, "userId");
-  const conversation = await requireConversation(validUserId, chatId);
+  const conversation = await requireActiveConversation(validUserId, chatId);
   const now = new Date();
 
   await Promise.all([
@@ -534,7 +678,7 @@ export async function markConversationRead(userId: string, chatId: string) {
 
 export async function notifyTyping(userId: string, chatId: string) {
   const validUserId = validateObjectId(userId, "userId");
-  const conversation = await requireConversation(validUserId, chatId);
+  const conversation = await requireActiveConversation(validUserId, chatId);
 
   void publishTyping({
     conversationId: String(conversation._id),
@@ -680,7 +824,7 @@ export async function getConversationsWith(
 
   const conversation = await findDirectConversation(validUserId, validOtherId);
 
-  if (!conversation) {
+  if (!conversation || !(await canChat(validUserId, validOtherId))) {
     return [];
   }
 

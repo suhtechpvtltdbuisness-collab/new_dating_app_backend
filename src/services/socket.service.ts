@@ -23,7 +23,7 @@ export const CloseCode = {
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_INBOUND_BYTES = 16 * 1024;
 
-type ClientMessage = { event: string; data: Record<string, unknown> };
+export type ClientMessage = { event: string; data: Record<string, unknown> };
 
 export interface SocketHooks {
   /** Runs after a socket authenticates. Return false to reject the user. */
@@ -34,7 +34,11 @@ export interface SocketHooks {
   onSocketOpen?: (userId: string, socket: WebSocket) => void;
   /** Last socket for this user closed. */
   onUserOffline?: (userId: string) => void;
-  onMessage?: (userId: string, message: ClientMessage) => void;
+  onMessage?: (
+    userId: string,
+    message: ClientMessage,
+    socket: WebSocket,
+  ) => void;
 }
 
 interface TrackedSocket extends WebSocket {
@@ -157,7 +161,7 @@ export function attachSocketServer(
         return;
       }
       try {
-        hooks.onMessage?.(userId, message);
+        hooks.onMessage?.(userId, message, ws);
       } catch (error) {
         console.error("Socket message handler failed", error);
       }
