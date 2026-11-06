@@ -58,6 +58,8 @@ export const env = {
   ).replace(/\/$/, ""),
   faceRecognitionServiceKey: process.env.FACE_RECOGNITION_SERVICE_KEY ?? "",
   faceMatchThreshold: Number(process.env.FACE_MATCH_THRESHOLD ?? 0.6),
+  /** Firebase service account JSON (raw or base64). Empty = no push notifications. */
+  firebaseServiceAccount: process.env.FIREBASE_SERVICE_ACCOUNT ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",

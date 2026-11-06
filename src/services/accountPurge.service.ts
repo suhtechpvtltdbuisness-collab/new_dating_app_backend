@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { ChatModel } from "../models/Chat";
 import { ConversationModel } from "../models/Conversation";
+import { DeviceTokenModel } from "../models/DeviceToken";
 import { MediaModel } from "../models/Media";
 import { NotificationModel } from "../models/Notification";
 import { OtpCodeModel } from "../models/OtpCode";
@@ -61,6 +62,7 @@ export async function purgeUser(userId: string): Promise<boolean> {
     NotificationModel.deleteMany({ userId: id }),
     MediaModel.deleteMany({ ownerId: id }),
     RefreshTokenModel.deleteMany({ userId: id }),
+    DeviceTokenModel.deleteMany({ userId: id }),
     otpFilter.length ? OtpCodeModel.deleteMany({ $or: otpFilter }) : Promise.resolve(),
     UserModel.updateMany({ blockedUsers: id }, { $pull: { blockedUsers: id } }),
   ]);

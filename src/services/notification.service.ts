@@ -17,6 +17,7 @@ import {
   validateCreateNotificationInput,
 } from "../validation/notification.validation";
 import { validateObjectId } from "../validation/chat.validation";
+import { pushToUser } from "./push.service";
 import { emitToUser } from "./socket.service";
 
 export interface NotifyInput {
@@ -64,6 +65,17 @@ export async function notifyUser(
     const unreadCount = await countUnreadNotifications(userId);
     emitToUser(userId, "notification", {
       notification: presentNotification(notification.toObject()),
+      unreadCount,
+    });
+
+    // Reaches the phone when the app is closed or in the background.
+    await pushToUser(userId, {
+      notificationId: String(notification._id),
+      type: input.type,
+      title: input.title.slice(0, 120),
+      body: input.body.slice(0, 1000),
+      metadata: input.metadata ?? {},
+      count,
       unreadCount,
     });
   } catch (error) {

@@ -8,7 +8,38 @@ import {
   markAllUserNotificationsAsRead,
   markUserNotificationAsRead,
 } from "../services/notification.service";
+import { registerDevice, unregisterDevice } from "../services/push.service";
 import { param, requireUserId } from "../utils/context";
+
+/** POST /notifications/devices — save this install's FCM token and settings. */
+export async function registerDeviceHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = requireUserId(res);
+    const result = await registerDevice(userId, req.body ?? {});
+    res.status(200).json({ message: "Device registered", data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** DELETE /notifications/devices — stop pushes to this install (logout). */
+export async function unregisterDeviceHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = requireUserId(res);
+    const result = await unregisterDevice(userId, req.body?.token);
+    res.status(200).json({ message: "Device removed", data: result });
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function createNotificationHandler(
   req: Request,

@@ -19,6 +19,7 @@ import { validateObjectId } from "../validation/chat.validation";
 import { logAdminActivity } from "./adminAuth.service";
 import { purgeUser } from "./accountPurge.service";
 import { notifyUser } from "./notification.service";
+import { removeAllDevices } from "./push.service";
 import { CloseCode, disconnectUser, emitToUser } from "./socket.service";
 
 const SUMMARY_FIELDS = "name email photos isBanned publicUserId";
@@ -226,6 +227,8 @@ export async function banUser(admin: AdminContext, userId: string) {
     message: "This account has been suspended",
   });
   disconnectUser(userId, CloseCode.suspended, "account suspended");
+  // A suspended account gets no more pushes; they register again after unban.
+  await removeAllDevices(userId);
   return user;
 }
 
