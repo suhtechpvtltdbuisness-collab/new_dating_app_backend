@@ -43,11 +43,12 @@ function escapeRegex(value: string): string {
 
 // ------------------------------------------------------------------ dashboard
 export async function getAdminStats() {
-  const [totalUsers, verifiedUsers, bannedUsers, totalMatches, pendingReports] =
+  const [totalUsers, verifiedUsers, bannedUsers, premiumUsers, totalMatches, pendingReports] =
     await Promise.all([
       UserModel.countDocuments({}),
       UserModel.countDocuments({ isVerified: true }),
       UserModel.countDocuments({ isBanned: true }),
+      UserModel.countDocuments({ isPremium: true }),
       SwipeModel.countDocuments(MATCH_FILTER),
       ReportModel.countDocuments({ status: { $in: PENDING_REPORT_STATUSES } }),
     ]);
@@ -56,8 +57,7 @@ export async function getAdminStats() {
     totalUsers,
     verifiedUsers,
     bannedUsers,
-    // The app has no paid plans yet.
-    premiumUsers: 0,
+    premiumUsers,
     totalMatches,
     pendingReports,
   };

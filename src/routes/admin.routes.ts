@@ -42,6 +42,7 @@ import {
   adminUpdateSiteContentHandler,
   getSiteContentHandler,
 } from "../controller/siteContent.controller";
+import { adminListPaymentsHandler } from "../controller/payment.controller";
 import { uploadAny } from "../middlewares/upload";
 import { authenticateAdmin } from "../middlewares/authenticateAdmin";
 
@@ -99,5 +100,8 @@ adminRouter.delete("/blogs-comments/:commentId", adminDeleteCommentHandler);
 adminRouter.get("/website-content", getSiteContentHandler);
 adminRouter.put("/website-content", adminUpdateSiteContentHandler);
 adminRouter.post("/website-content", adminUpdateSiteContentHandler);
+
+// Payment Transactions History
+adminRouter.get("/payments", adminListPaymentsHandler);
 
 export default adminRouter;

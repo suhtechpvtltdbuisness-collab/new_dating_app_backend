@@ -121,6 +121,10 @@ const userSchema = new Schema(
     isHidden: { type: Boolean, default: false },
     // Hibernates the profile: hidden from discovery. Matches and existing chats can still see it.
     isIncognito: { type: Boolean, default: false, index: true },
+    // Premium / VIP subscription status
+    isPremium: { type: Boolean, default: false, index: true },
+    premiumPlanId: { type: Schema.Types.ObjectId, ref: "Plan" },
+    premiumExpiresAt: { type: Date },
     // Set by an admin from the admin panel; unlike `active`/`isHidden` the user cannot change it.
     isBanned: { type: Boolean, default: false, index: true },
     bannedAt: { type: Date },
