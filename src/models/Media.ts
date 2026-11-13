@@ -5,7 +5,7 @@ const mediaSchema = new Schema(
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
       index: true,
     },
     contentType: { type: String, required: true },

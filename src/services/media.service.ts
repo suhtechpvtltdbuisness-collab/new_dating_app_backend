@@ -8,7 +8,7 @@ import { env } from "../config/env";
 import { MediaModel } from "../models/Media";
 import { validateObjectId } from "../validation/chat.validation";
 
-function baseUrlOf(req: Request): string {
+export function baseUrlOf(req: Request): string {
   if (env.publicBaseUrl) {
     return env.publicBaseUrl.replace(/\/$/, "");
   }

@@ -21,6 +21,7 @@ import supportRouter from "./routes/support.routes";
 import swipeRouter from "./routes/swipe.routes";
 import userRouter from "./routes/user.routes";
 import planRouter from "./routes/plan.routes";
+import blogRouter from "./routes/blog.routes";
 
 const app = express();
 
@@ -128,6 +129,7 @@ app.use(
     "/swipes",
     "/support",
     "/plans",
+    "/blogs",
   ],
   async (_req, _res, next) => {
     try {
@@ -153,6 +155,7 @@ app.use("/chat-history", chatHistoryRouter);
 app.use("/swipes", swipeRouter);
 app.use("/support", supportRouter);
 app.use("/plans", planRouter);
+app.use("/blogs", blogRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

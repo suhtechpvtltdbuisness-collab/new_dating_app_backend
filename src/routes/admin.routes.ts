@@ -25,6 +25,20 @@ import {
   adminTogglePlanHandler,
   adminUpdatePlanHandler,
 } from "../controller/plan.controller";
+import {
+  adminApproveCommentHandler,
+  adminCreateBlogHandler,
+  adminDeleteBlogHandler,
+  adminDeleteCommentHandler,
+  adminGetBlogHandler,
+  adminListBlogsHandler,
+  adminListCommentsHandler,
+  adminRejectCommentHandler,
+  adminToggleBlogHandler,
+  adminUpdateBlogHandler,
+  adminUploadBlogCoverHandler,
+} from "../controller/blog.controller";
+import { uploadAny } from "../middlewares/upload";
 import { authenticateAdmin } from "../middlewares/authenticateAdmin";
 
 const adminRouter = Router();
@@ -60,5 +74,21 @@ adminRouter.put("/plans/:id", adminUpdatePlanHandler);
 adminRouter.post("/plans/:id", adminUpdatePlanHandler);
 adminRouter.post("/plans/:id/toggle", adminTogglePlanHandler);
 adminRouter.delete("/plans/:id", adminDeletePlanHandler);
+
+// Blog Posts
+adminRouter.get("/blogs", adminListBlogsHandler);
+adminRouter.post("/blogs", adminCreateBlogHandler);
+adminRouter.post("/blogs/upload-cover", uploadAny, adminUploadBlogCoverHandler);
+adminRouter.get("/blogs/:id", adminGetBlogHandler);
+adminRouter.put("/blogs/:id", adminUpdateBlogHandler);
+adminRouter.post("/blogs/:id", adminUpdateBlogHandler);
+adminRouter.post("/blogs/:id/toggle", adminToggleBlogHandler);
+adminRouter.delete("/blogs/:id", adminDeleteBlogHandler);
+
+// Blog Comments Moderation
+adminRouter.get("/blogs-comments", adminListCommentsHandler);
+adminRouter.post("/blogs-comments/:commentId/approve", adminApproveCommentHandler);
+adminRouter.post("/blogs-comments/:commentId/reject", adminRejectCommentHandler);
+adminRouter.delete("/blogs-comments/:commentId", adminDeleteCommentHandler);
 
 export default adminRouter;
