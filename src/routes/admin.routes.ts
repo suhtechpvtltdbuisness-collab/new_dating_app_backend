@@ -38,6 +38,10 @@ import {
   adminUpdateBlogHandler,
   adminUploadBlogCoverHandler,
 } from "../controller/blog.controller";
+import {
+  adminUpdateSiteContentHandler,
+  getSiteContentHandler,
+} from "../controller/siteContent.controller";
 import { uploadAny } from "../middlewares/upload";
 import { authenticateAdmin } from "../middlewares/authenticateAdmin";
 
@@ -90,5 +94,10 @@ adminRouter.get("/blogs-comments", adminListCommentsHandler);
 adminRouter.post("/blogs-comments/:commentId/approve", adminApproveCommentHandler);
 adminRouter.post("/blogs-comments/:commentId/reject", adminRejectCommentHandler);
 adminRouter.delete("/blogs-comments/:commentId", adminDeleteCommentHandler);
+
+// Website Content CMS
+adminRouter.get("/website-content", getSiteContentHandler);
+adminRouter.put("/website-content", adminUpdateSiteContentHandler);
+adminRouter.post("/website-content", adminUpdateSiteContentHandler);
 
 export default adminRouter;

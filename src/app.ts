@@ -22,6 +22,7 @@ import swipeRouter from "./routes/swipe.routes";
 import userRouter from "./routes/user.routes";
 import planRouter from "./routes/plan.routes";
 import blogRouter from "./routes/blog.routes";
+import siteContentRouter from "./routes/siteContent.routes";
 
 const app = express();
 
@@ -130,6 +131,7 @@ app.use(
     "/support",
     "/plans",
     "/blogs",
+    "/site-content",
   ],
   async (_req, _res, next) => {
     try {
@@ -156,6 +158,7 @@ app.use("/swipes", swipeRouter);
 app.use("/support", supportRouter);
 app.use("/plans", planRouter);
 app.use("/blogs", blogRouter);
+app.use("/site-content", siteContentRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
