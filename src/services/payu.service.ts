@@ -11,6 +11,8 @@ export interface InitiatePaymentInput {
   userId: string;
   planId: string;
   phone?: string;
+  email?: string;
+  name?: string;
 }
 
 export interface PayUFormParams {
@@ -173,16 +175,25 @@ export async function initiatePayuPayment(input: InitiatePaymentInput) {
   const numericAmount = parseNumericPrice(plan.price);
   const amountFormatted = numericAmount.toFixed(2);
 
-  // Generate unique transaction ID
-  const txnid = `TXN_${Date.now()}_${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+  // Generate unique transaction ID (strictly alphanumeric ^[a-zA-Z0-9]*$, max 25 chars for PayU SDK)
+  const txnid = `TXN${Date.now()}${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 
-  // Safe fallback values for PayU requirements
-  const firstname = (user.name || "Customer").trim().split(" ")[0];
-  const email = (user.profile || "customer@vellora.my").includes("@")
-    ? (user.profile as string)
-    : "customer@vellora.my";
-  const phone = input.phone?.replace(/[^0-9]/g, "") || "9999999999";
-  const productinfo = plan.title.replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 50);
+  // Contact details: prioritize explicitly passed values, fallback to authenticated user DB profile
+  const resolvedName = (input.name || user.name || "Customer").trim();
+  const firstname =
+    resolvedName.split(" ")[0].replace(/[^a-zA-Z0-9]/g, "") || "Customer";
+
+  const resolvedEmail = (input.email || user.email || "").trim();
+  const email =
+    resolvedEmail && resolvedEmail.includes("@")
+      ? resolvedEmail
+      : "customer@vellora.my";
+
+  const userPhone = input.phone || user.phoneNumber || "";
+  const rawDigits = userPhone.replace(/[^0-9]/g, "");
+  const phone = rawDigits.length >= 10 ? rawDigits.slice(-10) : "9999999999";
+  const productinfo =
+    plan.title.replace(/[^a-zA-Z0-9 ]/g, "").slice(0, 50) || "Subscription";
 
   const udf1 = String(user._id);
   const udf2 = String(plan._id);
@@ -239,7 +250,7 @@ export async function initiatePayuPayment(input: InitiatePaymentInput) {
     paymentGateway: "payu",
     hash,
     customer: {
-      name: user.name,
+      name: resolvedName,
       email,
       phone,
     },

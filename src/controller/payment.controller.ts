@@ -27,7 +27,7 @@ export async function initiatePaymentHandler(
       return;
     }
 
-    const { planId, phone } = req.body ?? {};
+    const { planId, phone, email, name } = req.body ?? {};
     if (!planId) {
       res.status(400).json({ success: false, message: "planId is required" });
       return;
@@ -37,6 +37,8 @@ export async function initiatePaymentHandler(
       userId,
       planId: String(planId),
       phone: phone ? String(phone) : undefined,
+      email: email ? String(email) : undefined,
+      name: name ? String(name) : undefined,
     });
 
     res.status(200).json({
