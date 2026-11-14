@@ -47,6 +47,7 @@ mediaRouter.get("/view", async (req, res, next) => {
 const staticUploadDirs = [
   env.uploadDir,
   path.resolve(process.cwd(), "uploads"),
+  path.resolve(process.cwd(), "uploads/uploads"),
 ].filter(Boolean) as string[];
 
 for (const dir of staticUploadDirs) {

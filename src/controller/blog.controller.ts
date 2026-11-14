@@ -334,7 +334,6 @@ export async function adminUploadBlogCoverHandler(
         file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) ||
         "cover.jpg";
       const relativePath = path.posix.join(
-        "uploads",
         "blogs",
         `${Date.now()}-${cleanName}`,
       );
