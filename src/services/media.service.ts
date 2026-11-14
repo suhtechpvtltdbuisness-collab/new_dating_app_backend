@@ -9,6 +9,17 @@ import { MediaModel } from "../models/Media";
 import { validateObjectId } from "../validation/chat.validation";
 
 export function baseUrlOf(req: Request): string {
+  const host = req.get("host") || "";
+  // In local development (localhost / 127.0.0.1 / LAN IP), use incoming host so local media URLs resolve properly
+  if (
+    host.includes("localhost") ||
+    host.includes("127.0.0.1") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("10.")
+  ) {
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+    return `${proto}://${host}`;
+  }
   if (env.publicBaseUrl) {
     return env.publicBaseUrl.replace(/\/$/, "");
   }
@@ -17,7 +28,7 @@ export function baseUrlOf(req: Request): string {
     typeof forwardedProto === "string"
       ? forwardedProto.split(",")[0]
       : req.protocol;
-  return `${protocol}://${req.get("host")}`;
+  return `${protocol}://${host}`;
 }
 
 function safeFilename(name: string): string {
@@ -40,12 +51,21 @@ function contentTypeFromName(filename: string): string {
   }
 }
 
-function ensureUploadRoot(): string {
-  const root = env.uploadDir;
-  if (!existsSync(root)) {
-    mkdirSync(root, { recursive: true });
+export function ensureUploadRoot(): string {
+  const preferred = env.uploadDir || path.resolve(process.cwd(), "uploads");
+  try {
+    if (!existsSync(preferred)) {
+      mkdirSync(preferred, { recursive: true });
+    }
+    return preferred;
+  } catch {
+    // If preferred path has no write permissions (e.g. /volume on local macOS), fallback to ./uploads in project root
+    const fallback = path.resolve(process.cwd(), "uploads");
+    if (!existsSync(fallback)) {
+      mkdirSync(fallback, { recursive: true });
+    }
+    return fallback;
   }
-  return root;
 }
 
 function isVolumePath(value: string): boolean {

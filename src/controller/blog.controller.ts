@@ -4,7 +4,7 @@ import path from "path";
 import { put } from "@vercel/blob";
 import { env } from "../config/env";
 import { MediaModel } from "../models/Media";
-import { baseUrlOf } from "../services/media.service";
+import { baseUrlOf, ensureUploadRoot } from "../services/media.service";
 import {
   addBlogComment,
   adminCreateBlog,
@@ -325,31 +325,59 @@ export async function adminUploadBlogCoverHandler(
     }
 
     let imageUrl = "";
+    const baseUrl = baseUrlOf(req);
 
-    if (env.uploadDir) {
-      const root = env.uploadDir;
-      const cleanName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "cover.jpg";
-      const relativePath = path.posix.join("uploads", "blogs", `${Date.now()}-${cleanName}`);
+    // 1. Try saving to disk (UPLOAD_DIR or local ./uploads fallback)
+    try {
+      const root = ensureUploadRoot();
+      const cleanName =
+        file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) ||
+        "cover.jpg";
+      const relativePath = path.posix.join(
+        "uploads",
+        "blogs",
+        `${Date.now()}-${cleanName}`,
+      );
       const absolutePath = path.join(root, relativePath);
       await fs.mkdir(path.dirname(absolutePath), { recursive: true });
       await fs.writeFile(absolutePath, file.buffer);
-      imageUrl = `${baseUrlOf(req)}/media/file/${relativePath}`;
-    } else if (env.blobReadWriteToken) {
-      const cleanName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "cover.jpg";
-      const pathname = `blogs/${Date.now()}-${cleanName}`;
-      const blob = await put(pathname, file.buffer, {
-        access: "public",
-        contentType: file.mimetype || "image/jpeg",
-        token: env.blobReadWriteToken,
-      });
-      imageUrl = blob.url;
-    } else {
+      imageUrl = `${baseUrl}/media/file/${relativePath}`;
+    } catch (diskErr) {
+      console.warn(
+        "[BlogCoverUpload] Disk write failed, attempting fallback:",
+        diskErr,
+      );
+    }
+
+    // 2. Try Vercel Blob if available
+    if (!imageUrl && env.blobReadWriteToken) {
+      try {
+        const cleanName =
+          file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) ||
+          "cover.jpg";
+        const pathname = `blogs/${Date.now()}-${cleanName}`;
+        const blob = await put(pathname, file.buffer, {
+          access: "public",
+          contentType: file.mimetype || "image/jpeg",
+          token: env.blobReadWriteToken,
+        });
+        imageUrl = blob.url;
+      } catch (blobErr) {
+        console.warn(
+          "[BlogCoverUpload] Blob storage failed, attempting MediaModel:",
+          blobErr,
+        );
+      }
+    }
+
+    // 3. Guaranteed reliable fallback: MongoDB MediaModel
+    if (!imageUrl) {
       const media = await MediaModel.create({
         contentType: file.mimetype || "image/jpeg",
         size: file.size,
         data: file.buffer,
       });
-      imageUrl = `${baseUrlOf(req)}/media/${media._id}`;
+      imageUrl = `${baseUrl}/media/${media._id}`;
     }
 
     res.status(201).json({

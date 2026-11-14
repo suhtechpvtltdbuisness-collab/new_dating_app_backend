@@ -1,10 +1,17 @@
 import express, { Router } from "express";
+import path from "path";
 import { Readable } from "stream";
 import { AuthError } from "../errors/AuthError";
 import { env } from "../config/env";
 import { readMedia, readPrivateBlob } from "../services/media.service";
 
 const mediaRouter = Router();
+
+mediaRouter.use((_req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  next();
+});
 
 mediaRouter.get("/view", async (req, res, next) => {
   try {
@@ -36,12 +43,17 @@ mediaRouter.get("/view", async (req, res, next) => {
   }
 });
 
-/** Serve files stored on the Railway volume when UPLOAD_DIR is configured. */
-if (env.uploadDir) {
+/** Serve files stored on Railway volume or local uploads folder */
+const staticUploadDirs = [
+  env.uploadDir,
+  path.resolve(process.cwd(), "uploads"),
+].filter(Boolean) as string[];
+
+for (const dir of staticUploadDirs) {
   mediaRouter.use(
     "/file",
-    express.static(env.uploadDir, {
-      fallthrough: false,
+    express.static(dir, {
+      fallthrough: true,
       maxAge: "1d",
       setHeaders(res) {
         res.setHeader("X-Content-Type-Options", "nosniff");
