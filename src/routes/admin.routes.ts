@@ -43,7 +43,7 @@ import {
   getSiteContentHandler,
 } from "../controller/siteContent.controller";
 import { adminListPaymentsHandler } from "../controller/payment.controller";
-import { uploadAny } from "../middlewares/upload";
+import { uploadAdminCover, uploadAny } from "../middlewares/upload";
 import { authenticateAdmin } from "../middlewares/authenticateAdmin";
 
 const adminRouter = Router();
@@ -83,7 +83,7 @@ adminRouter.delete("/plans/:id", adminDeletePlanHandler);
 // Blog Posts
 adminRouter.get("/blogs", adminListBlogsHandler);
 adminRouter.post("/blogs", adminCreateBlogHandler);
-adminRouter.post("/blogs/upload-cover", uploadAny, adminUploadBlogCoverHandler);
+adminRouter.post("/blogs/upload-cover", uploadAdminCover, adminUploadBlogCoverHandler);
 adminRouter.get("/blogs/:id", adminGetBlogHandler);
 adminRouter.put("/blogs/:id", adminUpdateBlogHandler);
 adminRouter.post("/blogs/:id", adminUpdateBlogHandler);

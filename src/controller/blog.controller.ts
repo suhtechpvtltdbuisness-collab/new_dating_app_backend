@@ -327,25 +327,27 @@ export async function adminUploadBlogCoverHandler(
     let imageUrl = "";
     const baseUrl = baseUrlOf(req);
 
-    // 1. Try saving to disk (UPLOAD_DIR or local ./uploads fallback)
-    try {
-      const root = ensureUploadRoot();
-      const cleanName =
-        file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) ||
-        "cover.jpg";
-      const relativePath = path.posix.join(
-        "blogs",
-        `${Date.now()}-${cleanName}`,
-      );
-      const absolutePath = path.join(root, relativePath);
-      await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-      await fs.writeFile(absolutePath, file.buffer);
-      imageUrl = `${baseUrl}/media/file/${relativePath}`;
-    } catch (diskErr) {
-      console.warn(
-        "[BlogCoverUpload] Disk write failed, attempting fallback:",
-        diskErr,
-      );
+    // 1. If persistent volume is configured (e.g. Railway persistent volume), save to volume
+    if (env.uploadDir) {
+      try {
+        const root = ensureUploadRoot();
+        const cleanName =
+          file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) ||
+          "cover.jpg";
+        const relativePath = path.posix.join(
+          "blogs",
+          `${Date.now()}-${cleanName}`,
+        );
+        const absolutePath = path.join(root, relativePath);
+        await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+        await fs.writeFile(absolutePath, file.buffer);
+        imageUrl = `${baseUrl}/media/file/${relativePath}`;
+      } catch (diskErr) {
+        console.warn(
+          "[BlogCoverUpload] Volume disk write failed, attempting fallback:",
+          diskErr,
+        );
+      }
     }
 
     // 2. Try Vercel Blob if available
