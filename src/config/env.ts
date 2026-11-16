@@ -80,9 +80,17 @@ export const env = {
     initialPassword: process.env.ADMIN_INITIAL_PASSWORD ?? "",
   },
   payu: {
-    key: process.env.PAYU_KEY?.trim() ?? "BAbIL9",
-    salt: process.env.PAYU_SALT?.trim() ?? "kKSA6fHcbdzKVrWw1I8xMVzwcVAfykVE",
+    key: (process.env.PAYU_KEY?.trim() ?? "BAbIL9"),
+    salt: (process.env.PAYU_SALT?.trim() ?? "kKSA6fHcbdzKVrWw1I8xMVzwcVAfykVE"),
     baseUrl: (process.env.PAYU_BASE_URL?.trim() || "https://test.payu.in").replace(/\/$/, ""),
+    mcpSecret: (process.env.PAYU_MCP_SECRET?.trim() ?? ""),
+    environment: (
+      (process.env.PAYU_ENV?.trim().toLowerCase() === "production") ||
+      (process.env.PAYU_BASE_URL?.includes("secure.payu.in") ?? false)
+    ) ? 0 : 1,
+    isProduction:
+      (process.env.PAYU_ENV?.trim().toLowerCase() === "production") ||
+      (process.env.PAYU_BASE_URL?.includes("secure.payu.in") ?? false),
   },
   mail: buildMailConfig(),
 };

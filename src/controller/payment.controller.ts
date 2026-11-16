@@ -73,10 +73,24 @@ export async function generateHashHandler(
       email,
       udf1,
       udf2,
+      udf3,
+      udf4,
+      udf5,
     } = req.body ?? {};
 
+    const effectiveHashName = (hashName ? String(hashName) : "payment_hash").trim();
+
+    // Guard: dynamic SDK hashes require hashString from PayU SDK
+    if (effectiveHashName !== "payment_hash" && (typeof hashString !== "string" || !hashString)) {
+      res.status(400).json({
+        success: false,
+        message: `hashString is required for dynamic hash '${effectiveHashName}'`,
+      });
+      return;
+    }
+
     const hash = generateSdkHash({
-      hashName,
+      hashName: effectiveHashName,
       hashString,
       hashType,
       postSalt,
@@ -87,18 +101,38 @@ export async function generateHashHandler(
       email,
       udf1,
       udf2,
+      udf3,
+      udf4,
+      udf5,
     });
+
+    // Safe diagnostic logging (never prints salt, secret, or full hash)
+    console.log(
+      `[PayU Hash] Generated: name=${effectiveHashName}, type=${hashType || "V1"}, strLen=${hashString ? hashString.length : 0}, hasPostSalt=${Boolean(postSalt)}, hashLen=${hash.length}`,
+    );
 
     res.status(200).json({
       success: true,
       data: {
-        hashName: hashName || "payment_hash",
+        hashName: effectiveHashName,
         hash,
+        hashType:
+          hashType ||
+          (effectiveHashName === "mcpLookup"
+            ? "HMAC-SHA1"
+            : ["get_all_offer_details", "get_checkout_details"].includes(effectiveHashName)
+            ? "V2"
+            : "V1"),
       },
-      ...(hashName ? { [hashName]: hash } : { payment_hash: hash }),
+      [effectiveHashName]: hash,
+      hash,
     });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    console.error(`[PayU Hash Error] ${error.message}`);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Failed to generate PayU hash",
+    });
   }
 }
 

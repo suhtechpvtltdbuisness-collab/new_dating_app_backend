@@ -84,13 +84,7 @@ export function generatePayuRequestHash(params: {
   return crypto.createHash("sha512").update(hashString).digest("hex");
 }
 
-/**
- * Dynamic hash generation for PayU CheckoutPro SDK (payu_checkoutpro_flutter)
- * PayU SDK provides `hashString` without salt.
- * - For V2 hashes (e.g. get_all_offer_details, get_checkout_details): HMAC-SHA256 with salt as secret key.
- * - For V1 hashes: SHA-512(hashString + salt + [postSalt]).
- */
-export function generateSdkHash(input: {
+export interface GenerateSdkHashInput {
   hashName?: string;
   hashString?: string;
   hashType?: string;
@@ -102,31 +96,84 @@ export function generateSdkHash(input: {
   email?: string;
   udf1?: string;
   udf2?: string;
-}): string {
-  const salt = env.payu.salt;
+  udf3?: string;
+  udf4?: string;
+  udf5?: string;
+}
 
-  if (input.hashString) {
+/**
+ * Dynamic hash generation for PayU CheckoutPro SDK (payu_checkoutpro_flutter)
+ * Adheres strictly to official PayU specifications:
+ *
+ * 1. Special Hashes:
+ *    - mcpLookup: HMAC-SHA1 using merchant secret key (or salt).
+ *
+ * 2. V2 Dynamic Hashes:
+ *    - Triggered by hashType === "V2" (or documented V2 endpoints get_all_offer_details, get_checkout_details).
+ *    - Uses HMAC-SHA256 using merchant salt as key.
+ *    - Output: 64-character lowercase hex string.
+ *
+ * 3. V1 Dynamic Hashes (Default):
+ *    - Triggered by hashType === "V1" or default.
+ *    - Uses SHA-512(hashString + salt + [postSalt]).
+ *    - Output: 128-character lowercase hex string.
+ *
+ * 4. Initial Payment Request Hash (payment_hash):
+ *    - Fallback only when hashString is omitted and hashName is payment_hash.
+ *    - Uses SHA-512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||salt).
+ */
+export function generateSdkHash(input: GenerateSdkHashInput): string {
+  const salt = env.payu.salt;
+  if (!salt) {
+    throw new Error("PayU merchant salt is not configured on server.");
+  }
+
+  // 1. If hashString is provided by SDK, preserve exact string and apply algorithm:
+  if (typeof input.hashString === "string") {
+    const rawString = input.hashString;
+
+    // Special Case: mcpLookup requires HMAC-SHA1
+    if (input.hashName === "mcpLookup") {
+      const secretKey = env.payu.mcpSecret || salt;
+      return crypto
+        .createHmac("sha1", secretKey)
+        .update(rawString)
+        .digest("hex");
+    }
+
+    // V2 Dynamic Hashes: HMAC-SHA256
     const isV2 =
-      input.hashType === "V2" ||
-      input.hashType === "v2" ||
+      input.hashType?.toUpperCase() === "V2" ||
       (Boolean(input.hashName) &&
-        ["get_all_offer_details", "get_checkout_details", "mcpLookup"].includes(
-          input.hashName || "",
-        ) &&
-        input.hashType !== "V1");
+        ["get_all_offer_details", "get_checkout_details"].includes(input.hashName || "") &&
+        input.hashType?.toUpperCase() !== "V1");
 
     if (isV2) {
       return crypto
         .createHmac("sha256", salt)
-        .update(input.hashString)
+        .update(rawString)
         .digest("hex");
     }
 
-    let toHash = input.hashString + salt;
-    if (input.postSalt) {
+    // V1 Dynamic Hashes: SHA-512
+    let toHash = rawString + salt;
+    if (input.postSalt && typeof input.postSalt === "string" && input.postSalt.length > 0) {
       toHash += input.postSalt;
     }
+
     return crypto.createHash("sha512").update(toHash).digest("hex");
+  }
+
+  // 2. If hashString is missing but a specific SDK hash was requested:
+  if (input.hashName && input.hashName !== "payment_hash") {
+    throw new Error(
+      `Cannot generate dynamic hash for '${input.hashName}': hashString is required.`,
+    );
+  }
+
+  // 3. Fallback for initial payment_hash:
+  if (!env.payu.key) {
+    throw new Error("PayU merchant key is not configured on server.");
   }
 
   return generatePayuRequestHash({
@@ -138,7 +185,10 @@ export function generateSdkHash(input: {
     email: input.email || "",
     udf1: input.udf1 || "",
     udf2: input.udf2 || "",
-    salt: env.payu.salt,
+    udf3: input.udf3 || "",
+    udf4: input.udf4 || "",
+    udf5: input.udf5 || "",
+    salt,
   });
 }
 
@@ -281,6 +331,7 @@ export async function initiatePayuPayment(input: InitiatePaymentInput) {
 
   const actionUrl = `${env.payu.baseUrl}/_payment`;
   const checkoutUrl = `${baseUrl}/payments/payu/checkout/${txnid}`;
+  const environment = env.payu.isProduction ? 0 : 1; // 0 = Production, 1 = Test
 
   return {
     txnid,
@@ -289,7 +340,11 @@ export async function initiatePayuPayment(input: InitiatePaymentInput) {
     planTitle: plan.title,
     actionUrl,
     checkoutUrl,
-    params,
+    environment,
+    params: {
+      ...params,
+      environment,
+    },
   };
 }
 
