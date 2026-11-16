@@ -86,11 +86,15 @@ export function generatePayuRequestHash(params: {
 
 /**
  * Dynamic hash generation for PayU CheckoutPro SDK (payu_checkoutpro_flutter)
- * PayU SDK provides `hashString` without salt; backend appends salt and hashes.
+ * PayU SDK provides `hashString` without salt.
+ * - For V2 hashes (e.g. get_all_offer_details, get_checkout_details): HMAC-SHA256 with salt as secret key.
+ * - For V1 hashes: SHA-512(hashString + salt + [postSalt]).
  */
 export function generateSdkHash(input: {
   hashName?: string;
   hashString?: string;
+  hashType?: string;
+  postSalt?: string;
   txnid?: string;
   amount?: string;
   productinfo?: string;
@@ -99,12 +103,30 @@ export function generateSdkHash(input: {
   udf1?: string;
   udf2?: string;
 }): string {
+  const salt = env.payu.salt;
+
   if (input.hashString) {
-    // If hashString already ends with salt or pipe, handle cleanly
-    const raw = input.hashString.endsWith("|")
-      ? `${input.hashString}${env.payu.salt}`
-      : `${input.hashString}${env.payu.salt}`;
-    return crypto.createHash("sha512").update(raw).digest("hex");
+    const isV2 =
+      input.hashType === "V2" ||
+      input.hashType === "v2" ||
+      (Boolean(input.hashName) &&
+        ["get_all_offer_details", "get_checkout_details", "mcpLookup"].includes(
+          input.hashName || "",
+        ) &&
+        input.hashType !== "V1");
+
+    if (isV2) {
+      return crypto
+        .createHmac("sha256", salt)
+        .update(input.hashString)
+        .digest("hex");
+    }
+
+    let toHash = input.hashString + salt;
+    if (input.postSalt) {
+      toHash += input.postSalt;
+    }
+    return crypto.createHash("sha512").update(toHash).digest("hex");
   }
 
   return generatePayuRequestHash({

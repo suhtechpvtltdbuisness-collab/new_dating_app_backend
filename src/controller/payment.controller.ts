@@ -64,6 +64,8 @@ export async function generateHashHandler(
     const {
       hashName,
       hashString,
+      hashType,
+      postSalt,
       txnid,
       amount,
       productinfo,
@@ -76,6 +78,8 @@ export async function generateHashHandler(
     const hash = generateSdkHash({
       hashName,
       hashString,
+      hashType,
+      postSalt,
       txnid,
       amount,
       productinfo,
