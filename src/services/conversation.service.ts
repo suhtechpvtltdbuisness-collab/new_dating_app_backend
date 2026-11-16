@@ -19,7 +19,7 @@ import {
   publishMessagesRead,
   publishTyping,
 } from "./realtime.service";
-import { canChat, chatPartnerIds } from "./chatAccess.service";
+import { canChat, chatPartnerIds, isUserSubscriptionActive } from "./chatAccess.service";
 import { canSeeIncognitoUser } from "./incognito.service";
 import { extractBlobPathname } from "./media.service";
 import { isUserConnected } from "./socket.service";
@@ -74,6 +74,17 @@ async function requireConversation(userId: string, chatId: string) {
  */
 async function requireActiveConversation(userId: string, chatId: string) {
   const conversation = await requireConversation(userId, chatId);
+
+  const sender = await UserModel.findById(userId)
+    .select("isPremium premiumExpiresAt")
+    .lean();
+  if (!sender || !isUserSubscriptionActive(sender)) {
+    throw new AuthError(
+      "A subscription is required to chat with your matches. Please upgrade to Premium.",
+      403,
+    );
+  }
+
   if (!(await canChat(userId, otherParticipantId(conversation, userId)))) {
     throw new AuthError(CANNOT_CHAT_MESSAGE, 403);
   }
@@ -201,6 +212,16 @@ export async function createConversation(
 
   if ((recipient.blockedUsers ?? []).some((id) => String(id) === validUserId)) {
     throw new AuthError("You cannot message this user", 403);
+  }
+
+  const currentUser = await UserModel.findById(validUserId)
+    .select("isPremium premiumExpiresAt")
+    .lean();
+  if (!currentUser || !isUserSubscriptionActive(currentUser)) {
+    throw new AuthError(
+      "A subscription is required to chat with your matches. Please upgrade to Premium.",
+      403,
+    );
   }
 
   if (!(await canChat(validUserId, recipientId))) {

@@ -5,8 +5,23 @@ import { UserModel } from "../models/User";
 import { emitToUsers } from "./socket.service";
 
 /**
- * Two people can chat only while they like each other (a match) and neither
- * has blocked the other. Unmatch, reject and block all end the chat.
+ * Checks if a user has an active premium subscription.
+ */
+export function isUserSubscriptionActive(user: {
+  isPremium?: boolean;
+  premiumExpiresAt?: Date | null;
+}): boolean {
+  if (!user.isPremium) return false;
+  if (!user.premiumExpiresAt) return true; // Lifetime or active premium
+  return new Date(user.premiumExpiresAt) > new Date();
+}
+
+/**
+ * Two people can chat only while:
+ * 1. They like each other (a mutual match - like or superlike).
+ * 2. Neither has blocked the other or is banned.
+ * 3. The acting user (userA) has an active subscription.
+ * Unmatch, reject and block all end the chat.
  */
 export async function canChat(userA: string, userB: string): Promise<boolean> {
   if (!userA || !userB || userA === userB) return false;
@@ -20,10 +35,16 @@ export async function canChat(userA: string, userB: string): Promise<boolean> {
       ],
     }),
     UserModel.find({ _id: { $in: [userA, userB] } })
-      .select("blockedUsers isBanned")
+      .select("blockedUsers isBanned isPremium premiumExpiresAt")
       .lean(),
   ]);
   if (likes < 2 || users.length < 2) return false;
+
+  // Subscription Gate: Only users with an active subscription can chat!
+  const actingUser = users.find((u) => String(u._id) === userA);
+  if (!actingUser || !isUserSubscriptionActive(actingUser)) {
+    return false;
+  }
 
   return users.every((user) => {
     const otherId = String(user._id) === userA ? userB : userA;
@@ -36,8 +57,10 @@ export async function canChat(userA: string, userB: string): Promise<boolean> {
 
 /** Everyone the user can currently chat with (see `canChat`). */
 export async function chatPartnerIds(userId: string): Promise<string[]> {
-  const me = await UserModel.findById(userId).select("blockedUsers").lean();
-  if (!me) return [];
+  const me = await UserModel.findById(userId)
+    .select("blockedUsers isPremium premiumExpiresAt")
+    .lean();
+  if (!me || !isUserSubscriptionActive(me)) return [];
   const blocked = new Set((me.blockedUsers ?? []).map(String));
 
   const myLikes = await SwipeModel.find({ swiperId: userId, action: "like" })
