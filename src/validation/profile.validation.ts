@@ -225,9 +225,30 @@ export function validateUpdatePreferencesInput(
   }
 
   for (const field of [
+    "courses",
+    "qualities",
+    "languages",
+    "starSign",
+    "educationLevel",
+    "exercise",
+    "drinking",
+    "smoking",
+    "kids",
+    "haveKids",
+    "religion",
+    "politics",
+    "relationshipGoals",
+  ] as const) {
+    const value = payload[field];
+    if (value === undefined) continue;
+    updates[field] = asStringList(field, value).map((s) => s.trim()).filter((s) => s.length > 0);
+  }
+
+  for (const field of [
     "locationEnabled",
     "showOnline",
     "notificationsEnabled",
+    "verifiedOnly",
   ] as const) {
     const value = payload[field];
     if (value === undefined) continue;

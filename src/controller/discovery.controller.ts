@@ -5,7 +5,13 @@ import {
   listProfiles,
 } from "../services/discovery.service";
 import { swipeUser } from "../services/swipe.service";
-import { numericQuery, param, requireUserId } from "../utils/context";
+import {
+  booleanQuery,
+  numericQuery,
+  param,
+  requireUserId,
+  stringListQuery,
+} from "../utils/context";
 
 function discoveryQuery(req: Request) {
   return {
@@ -15,6 +21,23 @@ function discoveryQuery(req: Request) {
     minAge: numericQuery(req, "minAge"),
     maxAge: numericQuery(req, "maxAge"),
     gender: typeof req.query.gender === "string" ? req.query.gender : undefined,
+    interests: stringListQuery(req, "interests"),
+    courses: stringListQuery(req, "courses"),
+    qualities: stringListQuery(req, "qualities"),
+    languages: stringListQuery(req, "languages"),
+    starSign: stringListQuery(req, "starSign"),
+    educationLevel: stringListQuery(req, "educationLevel"),
+    exercise: stringListQuery(req, "exercise"),
+    drinking: stringListQuery(req, "drinking"),
+    smoking: stringListQuery(req, "smoking"),
+    lookingFor:
+      stringListQuery(req, "lookingFor") ??
+      stringListQuery(req, "relationshipGoals"),
+    kids: stringListQuery(req, "kids"),
+    haveKids: stringListQuery(req, "haveKids"),
+    religion: stringListQuery(req, "religion"),
+    politics: stringListQuery(req, "politics"),
+    verifiedOnly: booleanQuery(req, "verifiedOnly"),
   };
 }
 

@@ -28,6 +28,16 @@ function labelsForGender(value: string): string[] {
   return [v];
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+}
+
+function regexIn(values: string[]) {
+  return {
+    $in: values.map((v) => new RegExp(`^${escapeRegex(v)}$`, "i")),
+  };
+}
+
 export interface DiscoveryQuery {
   page?: number;
   limit?: number;
@@ -35,6 +45,21 @@ export interface DiscoveryQuery {
   minAge?: number;
   maxAge?: number;
   gender?: string;
+  interests?: string[];
+  courses?: string[];
+  qualities?: string[];
+  languages?: string[];
+  starSign?: string[];
+  educationLevel?: string[];
+  exercise?: string[];
+  drinking?: string[];
+  smoking?: string[];
+  lookingFor?: string[];
+  kids?: string[];
+  haveKids?: string[];
+  religion?: string[];
+  politics?: string[];
+  verifiedOnly?: boolean;
 }
 
 function clampLimit(limit?: number): number {
@@ -99,6 +124,87 @@ async function baseFilter(userId: string, query: DiscoveryQuery) {
   const maxAge = Number(query.maxAge ?? prefs.maxAge ?? 70);
   if (Number.isFinite(minAge) && Number.isFinite(maxAge)) {
     filter.dob = { $gte: ageToDob(maxAge + 1), $lte: ageToDob(minAge) };
+  }
+
+  // Advanced filters: match ANY selected within a category ($in regex)
+  // and ALL selected categories (each added to filter with AND logic)
+  const interests = query.interests ?? (prefs.interests as string[] | undefined);
+  if (interests && interests.length > 0) {
+    filter.interests = regexIn(interests);
+  }
+
+  const courses = query.courses ?? (prefs.courses as string[] | undefined);
+  if (courses && courses.length > 0) {
+    filter.courses = regexIn(courses);
+  }
+
+  const qualities = query.qualities ?? (prefs.qualities as string[] | undefined);
+  if (qualities && qualities.length > 0) {
+    filter.qualities = regexIn(qualities);
+  }
+
+  const languages = query.languages ?? (prefs.languages as string[] | undefined);
+  if (languages && languages.length > 0) {
+    filter.languages = regexIn(languages);
+  }
+
+  const starSign = query.starSign ?? (prefs.starSign as string[] | undefined);
+  if (starSign && starSign.length > 0) {
+    filter.starSign = regexIn(starSign);
+  }
+
+  const educationLevel =
+    query.educationLevel ?? (prefs.educationLevel as string[] | undefined);
+  if (educationLevel && educationLevel.length > 0) {
+    filter.educationLevel = regexIn(educationLevel);
+  }
+
+  const exercise = query.exercise ?? (prefs.exercise as string[] | undefined);
+  if (exercise && exercise.length > 0) {
+    filter.exercise = regexIn(exercise);
+  }
+
+  const drinking = query.drinking ?? (prefs.drinking as string[] | undefined);
+  if (drinking && drinking.length > 0) {
+    filter.drinking = regexIn(drinking);
+  }
+
+  const smoking = query.smoking ?? (prefs.smoking as string[] | undefined);
+  if (smoking && smoking.length > 0) {
+    filter.smoking = regexIn(smoking);
+  }
+
+  const lookingFor =
+    query.lookingFor ??
+    (prefs.relationshipGoals as string[] | undefined) ??
+    (prefs.lookingForFilter as string[] | undefined);
+  if (lookingFor && lookingFor.length > 0) {
+    filter.lookingFor = regexIn(lookingFor);
+  }
+
+  const kids = query.kids ?? (prefs.kids as string[] | undefined);
+  if (kids && kids.length > 0) {
+    filter.kids = regexIn(kids);
+  }
+
+  const haveKids = query.haveKids ?? (prefs.haveKids as string[] | undefined);
+  if (haveKids && haveKids.length > 0) {
+    filter.haveKids = regexIn(haveKids);
+  }
+
+  const religion = query.religion ?? (prefs.religion as string[] | undefined);
+  if (religion && religion.length > 0) {
+    filter.religion = regexIn(religion);
+  }
+
+  const politics = query.politics ?? (prefs.politics as string[] | undefined);
+  if (politics && politics.length > 0) {
+    filter.politics = regexIn(politics);
+  }
+
+  const verifiedOnly = query.verifiedOnly ?? prefs.verifiedOnly;
+  if (verifiedOnly === true) {
+    filter.isVerified = true;
   }
 
   return { currentUser, filter };

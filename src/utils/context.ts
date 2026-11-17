@@ -28,6 +28,37 @@ export function numericQuery(
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+export function stringListQuery(
+  req: Request,
+  name: string,
+): string[] | undefined {
+  const value = req.query[name];
+  if (value === undefined || value === null) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => String(v).trim())
+      .filter((v) => v.length > 0);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    return trimmed
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+  }
+  return undefined;
+}
+
+export function booleanQuery(
+  req: Request,
+  name: string,
+): boolean | undefined {
+  const value = req.query[name];
+  if (value === undefined || value === null) return undefined;
+  return value === "true" || value === "1";
+}
+
 export interface AdminContext {
   id: string;
   username: string;
