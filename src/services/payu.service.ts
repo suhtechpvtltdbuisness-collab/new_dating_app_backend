@@ -141,13 +141,8 @@ export function generateSdkHash(input: GenerateSdkHashInput): string {
         .digest("hex");
     }
 
-    // V2 Dynamic Hashes: HMAC-SHA256
-    const isV2 =
-      input.hashType?.toUpperCase() === "V2" ||
-      (Boolean(input.hashName) &&
-        ["get_all_offer_details", "get_checkout_details"].includes(input.hashName || "") &&
-        input.hashType?.toUpperCase() !== "V1");
-
+    // V2 Dynamic Hashes (Explicitly requested as V2 by SDK)
+    const isV2 = input.hashType?.toUpperCase() === "V2";
     if (isV2) {
       return crypto
         .createHmac("sha256", salt)
@@ -155,7 +150,9 @@ export function generateSdkHash(input: GenerateSdkHashInput): string {
         .digest("hex");
     }
 
-    // V1 Dynamic Hashes: SHA-512
+    // Standard Dynamic Hashes (V1 / SHA-512):
+    // Covers: get_checkout_details, get_sdk_configuration, vas_for_mobile_sdk,
+    // payment_related_details_for_mobile_sdk, quickPayEvent, get_all_offer_details, etc.
     let toHash = rawString + salt;
     if (input.postSalt && typeof input.postSalt === "string" && input.postSalt.length > 0) {
       toHash += input.postSalt;
