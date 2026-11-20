@@ -1,0 +1,3041 @@
+{
+  "info": {
+    "name": "Vellora \u2013 Astro Match API",
+    "description": "# Astro Match \u2014 Phase 1 APIs\n\nAstro Match compares two users' zodiac signs and returns a **compatibility score (0\u2013100%)**, both signs, strengths and challenges.\n\n## Quick start\n1. Set the `baseUrl` collection variable (local default `http://localhost:5001`; use staging for shared testing).\n2. Run **folder 0** \u2192 creates/logs in two test users and saves tokens automatically.\n3. Run any other request. Every request has **saved example responses** (open a request \u2192 *Examples*), so you can see the shape without running it.\n\n## Auth\nAll `/astro` and `/profile` routes need `Authorization: Bearer <accessToken>` (the `accessToken` from login). The collection sets it for you.\n\n## Response format\n- Success: `{ \"data\": { ... } }` (some also include `\"message\"`)\n- Error: `{ \"message\": \"human readable reason\" }` with status `400` / `401` / `404`\n\n## Endpoints\n| Method | Path | Use for |\n|---|---|---|\n| PUT | `/profile` | save `dob`, `birthTime`, `birthPlace` (existing endpoint, new fields) |\n| GET | `/astro/me` | own sign + which birth details are missing |\n| GET | `/astro/match/:userId` | **Astro Match card + details screen** |\n| GET | `/astro/compatibility?signA=&signB=` | sign-vs-sign score (no users) |\n\n## Key rules for the UI\n- **Score comes from the server only.** Never compute or adjust it in the app.\n- `band`: `excellent` \u226585 \u00b7 `strong` 70\u201384 \u00b7 `moderate` 50\u201369 \u00b7 `challenging` <50.\n- `available: false` is a normal 200 response \u2192 show an empty state, not an error.\n- `explanation` is `null` until the AI phase ships.\n- `starSign` is now set by the server from `dob`; the star-sign picker in Edit Profile can be removed or made read-only.\n- Birth time/place are private; other users' profiles never include them.\n\n## Coming next (Phase 2)\nBest Astro Matches list, Astro filter + sort in discovery, AI explanation text.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5001",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otherToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otherUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastScore",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth (get tokens)",
+      "description": "Run these first. They create (or log in) two test users \u2014 **A = Aries**, **B = Leo** \u2014 and save tokens + IDs to collection variables, so every other request works without copy-pasting.\n\nUse a **local or staging** server. Don't run Register against production.",
+      "item": [
+        {
+          "name": "Register user A (Aries)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "register"
+              ]
+            },
+            "description": "Existing endpoint. **Change for Astro Match:** the server now reads the sign from `dob` and stores it (`starSign` + `sunSign`).\n\n`dob` validation (new):\n- format `YYYY-MM-DD` (an ISO string with a time also works; only the date part is used)\n- not in the future, not before 1900\n- user must be **18 or older** \u2192 otherwise `400 { \"message\": \"You must be at least 18 years old\" }`\n\nTest script saves `accessToken` / `userId` to collection variables. Returns **409** if the user already exists; then just run the Login requests.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aarav Astro\",\n  \"phoneNumber\": \"+919000000101\",\n  \"email\": \"aarav.astro@example.com\",\n  \"password\": \"Test@12345\",\n  \"dob\": \"1995-04-10\",\n  \"gender\": \"male\",\n  \"interestedIn\": \"female\",\n  \"profile\": \"Astro Match test user A\",\n  \"location\": {\n    \"coordinates\": [\n      72.8777,\n      19.076\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "register"
+                  ]
+                },
+                "description": "Existing endpoint. **Change for Astro Match:** the server now reads the sign from `dob` and stores it (`starSign` + `sunSign`).\n\n`dob` validation (new):\n- format `YYYY-MM-DD` (an ISO string with a time also works; only the date part is used)\n- not in the future, not before 1900\n- user must be **18 or older** \u2192 otherwise `400 { \"message\": \"You must be at least 18 years old\" }`\n\nTest script saves `accessToken` / `userId` to collection variables. Returns **409** if the user already exists; then just run the Login requests.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Aarav Astro\",\n  \"phoneNumber\": \"+919000000101\",\n  \"email\": \"aarav.astro@example.com\",\n  \"password\": \"Test@12345\",\n  \"dob\": \"1995-04-10\",\n  \"gender\": \"male\",\n  \"interestedIn\": \"female\",\n  \"profile\": \"Astro Match test user A\",\n  \"location\": {\n    \"coordinates\": [\n      72.8777,\n      19.076\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"User registered\",\n  \"data\": {\n    \"userId\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"accessToken\": \"<jwt-token>\",\n    \"refreshToken\": \"<jwt-token>\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Registered (201) or already exists (409)\", () => pm.expect([200, 201, 409]).to.include(pm.response.code));",
+                  "if (pm.response.code < 300) {",
+                  "  const d = pm.response.json().data || {};",
+                  "  pm.collectionVariables.set(\"accessToken\", d.accessToken);",
+                  "  pm.collectionVariables.set(\"userId\", d.userId || (d.user && (d.user.id || d.user._id)));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register user B (Leo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "register"
+              ]
+            },
+            "description": "Existing endpoint. **Change for Astro Match:** the server now reads the sign from `dob` and stores it (`starSign` + `sunSign`).\n\n`dob` validation (new):\n- format `YYYY-MM-DD` (an ISO string with a time also works; only the date part is used)\n- not in the future, not before 1900\n- user must be **18 or older** \u2192 otherwise `400 { \"message\": \"You must be at least 18 years old\" }`\n\nTest script saves `accessToken` / `userId` to collection variables. Returns **409** if the user already exists; then just run the Login requests.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Diya Astro\",\n  \"phoneNumber\": \"+919000000102\",\n  \"email\": \"diya.astro@example.com\",\n  \"password\": \"Test@12345\",\n  \"dob\": \"1997-08-05\",\n  \"gender\": \"female\",\n  \"interestedIn\": \"male\",\n  \"profile\": \"Astro Match test user B\",\n  \"location\": {\n    \"coordinates\": [\n      72.88,\n      19.08\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "register"
+                  ]
+                },
+                "description": "Existing endpoint. **Change for Astro Match:** the server now reads the sign from `dob` and stores it (`starSign` + `sunSign`).\n\n`dob` validation (new):\n- format `YYYY-MM-DD` (an ISO string with a time also works; only the date part is used)\n- not in the future, not before 1900\n- user must be **18 or older** \u2192 otherwise `400 { \"message\": \"You must be at least 18 years old\" }`\n\nTest script saves `accessToken` / `userId` to collection variables. Returns **409** if the user already exists; then just run the Login requests.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Diya Astro\",\n  \"phoneNumber\": \"+919000000102\",\n  \"email\": \"diya.astro@example.com\",\n  \"password\": \"Test@12345\",\n  \"dob\": \"1997-08-05\",\n  \"gender\": \"female\",\n  \"interestedIn\": \"male\",\n  \"profile\": \"Astro Match test user B\",\n  \"location\": {\n    \"coordinates\": [\n      72.88,\n      19.08\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"User registered\",\n  \"data\": {\n    \"userId\": \"6afff90303cbde5fee363789\",\n    \"publicUserId\": \"USR-00002\",\n    \"email\": \"diya.astro@example.com\",\n    \"accessToken\": \"<jwt-token>\",\n    \"refreshToken\": \"<jwt-token>\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Registered (201) or already exists (409)\", () => pm.expect([200, 201, 409]).to.include(pm.response.code));",
+                  "if (pm.response.code < 300) {",
+                  "  const d = pm.response.json().data || {};",
+                  "  pm.collectionVariables.set(\"otherToken\", d.accessToken);",
+                  "  pm.collectionVariables.set(\"otherUserId\", d.userId || (d.user && (d.user.id || d.user._id)));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login user A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "login"
+              ]
+            },
+            "description": "Existing endpoint. Saves `accessToken` and `userId` (user A).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"aarav.astro@example.com\",\n  \"password\": \"Test@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "login"
+                  ]
+                },
+                "description": "Existing endpoint. Saves `accessToken` and `userId` (user A).",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"aarav.astro@example.com\",\n  \"password\": \"Test@12345\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"userId\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"accessToken\": \"<jwt-token>\",\n    \"refreshToken\": \"<jwt-token>\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const d = pm.response.json().data || {};",
+                  "  pm.collectionVariables.set(\"accessToken\", d.accessToken);",
+                  "  pm.collectionVariables.set(\"userId\", d.userId || (d.user && (d.user.id || d.user._id)));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login user B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "login"
+              ]
+            },
+            "description": "Existing endpoint. Saves `otherToken` and `otherUserId` (user B).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"diya.astro@example.com\",\n  \"password\": \"Test@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "login"
+                  ]
+                },
+                "description": "Existing endpoint. Saves `otherToken` and `otherUserId` (user B).",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"diya.astro@example.com\",\n  \"password\": \"Test@12345\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"userId\": \"6afff90303cbde5fee363789\",\n    \"publicUserId\": \"USR-00002\",\n    \"email\": \"diya.astro@example.com\",\n    \"accessToken\": \"<jwt-token>\",\n    \"refreshToken\": \"<jwt-token>\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const d = pm.response.json().data || {};",
+                  "  pm.collectionVariables.set(\"otherToken\", d.accessToken);",
+                  "  pm.collectionVariables.set(\"otherUserId\", d.userId || (d.user && (d.user.id || d.user._id)));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR register under 18 (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "register"
+              ]
+            },
+            "description": "New DOB rule: users under 18 are rejected at registration.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aarav Astro\",\n  \"phoneNumber\": \"+919000000199\",\n  \"email\": \"minor@example.com\",\n  \"password\": \"Test@12345\",\n  \"dob\": \"2012-01-01\",\n  \"gender\": \"male\",\n  \"interestedIn\": \"female\",\n  \"profile\": \"Astro Match test user A\",\n  \"location\": {\n    \"coordinates\": [\n      72.8777,\n      19.076\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "register"
+                  ]
+                },
+                "description": "New DOB rule: users under 18 are rejected at registration.",
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Aarav Astro\",\n  \"phoneNumber\": \"+919000000199\",\n  \"email\": \"minor@example.com\",\n  \"password\": \"Test@12345\",\n  \"dob\": \"2012-01-01\",\n  \"gender\": \"male\",\n  \"interestedIn\": \"female\",\n  \"profile\": \"Astro Match test user A\",\n  \"location\": {\n    \"coordinates\": [\n      72.8777,\n      19.076\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"You must be at least 18 years old\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Birth details (PUT /profile)",
+      "description": "**Existing endpoint `PUT /profile`, new optional fields.** Send only the fields you want to change.\n\n| Field | Type | Rules |\n|---|---|---|\n| `dob` | string | `YYYY-MM-DD`, not future, after 1900, 18+. Server recalculates `starSign` + `sunSign`. |\n| `birthTime` | string \\| null | 24h `HH:mm`, e.g. `\"06:45\"`. Local time at the birth place. Sets `birthTimeKnown: true`. `null` clears it. |\n| `birthTimeKnown` | boolean | `false` clears `birthTime` (for \"I don't know my birth time\"). `true` requires `birthTime` in the same request. |\n| `birthPlace` | object \\| null | `{ name, latitude, longitude, timezone }`, all required. `timezone` is IANA (e.g. `Asia/Kolkata`); get it from your places/geocoding SDK. `null` clears it. |\n\n**Response:** the full own profile (`data`). New fields in it: `birthTime`, `birthTimeKnown`, `birthPlace`, `sunSign`.\n\n**Note:** `starSign` is now derived from `dob`. A `starSign` sent without `dob` is ignored.\n\nBirth time/place are **private**: they only appear in the user's own profile, never in other users' profiles.",
+      "item": [
+        {
+          "name": "Set birth time + birth place",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "**Existing endpoint `PUT /profile`, new optional fields.** Send only the fields you want to change.\n\n| Field | Type | Rules |\n|---|---|---|\n| `dob` | string | `YYYY-MM-DD`, not future, after 1900, 18+. Server recalculates `starSign` + `sunSign`. |\n| `birthTime` | string \\| null | 24h `HH:mm`, e.g. `\"06:45\"`. Local time at the birth place. Sets `birthTimeKnown: true`. `null` clears it. |\n| `birthTimeKnown` | boolean | `false` clears `birthTime` (for \"I don't know my birth time\"). `true` requires `birthTime` in the same request. |\n| `birthPlace` | object \\| null | `{ name, latitude, longitude, timezone }`, all required. `timezone` is IANA (e.g. `Asia/Kolkata`); get it from your places/geocoding SDK. `null` clears it. |\n\n**Response:** the full own profile (`data`). New fields in it: `birthTime`, `birthTimeKnown`, `birthPlace`, `sunSign`.\n\n**Note:** `starSign` is now derived from `dob`. A `starSign` sent without `dob` is ignored.\n\nBirth time/place are **private**: they only appear in the user's own profile, never in other users' profiles.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthTime\": \"06:45\",\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "**Existing endpoint `PUT /profile`, new optional fields.** Send only the fields you want to change.\n\n| Field | Type | Rules |\n|---|---|---|\n| `dob` | string | `YYYY-MM-DD`, not future, after 1900, 18+. Server recalculates `starSign` + `sunSign`. |\n| `birthTime` | string \\| null | 24h `HH:mm`, e.g. `\"06:45\"`. Local time at the birth place. Sets `birthTimeKnown: true`. `null` clears it. |\n| `birthTimeKnown` | boolean | `false` clears `birthTime` (for \"I don't know my birth time\"). `true` requires `birthTime` in the same request. |\n| `birthPlace` | object \\| null | `{ name, latitude, longitude, timezone }`, all required. `timezone` is IANA (e.g. `Asia/Kolkata`); get it from your places/geocoding SDK. `null` clears it. |\n\n**Response:** the full own profile (`data`). New fields in it: `birthTime`, `birthTimeKnown`, `birthPlace`, `sunSign`.\n\n**Note:** `starSign` is now derived from `dob`. A `starSign` sent without `dob` is ignored.\n\nBirth time/place are **private**: they only appear in the user's own profile, never in other users' profiles.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthTime\": \"06:45\",\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Profile updated\",\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"name\": \"Aarav Astro\",\n    \"phoneNumber\": \"+919000000101\",\n    \"dob\": \"1995-04-10T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-04-10T00:00:00.000Z\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"birthTime\": \"06:45\",\n    \"birthTimeKnown\": true,\n    \"birthPlace\": {\n      \"name\": \"Mumbai, Maharashtra, India\",\n      \"latitude\": 19.076,\n      \"longitude\": 72.8777,\n      \"timezone\": \"Asia/Kolkata\"\n    },\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.8777,\n        19.076\n      ]\n    },\n    \"isVerified\": false,\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"score\": null,\n      \"threshold\": null,\n      \"reason\": \"\",\n      \"verifiedAt\": null,\n      \"lastAttemptAt\": null\n    },\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.217Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"birthTimeKnown true\", () => pm.expect(d.birthTimeKnown).to.eql(true));",
+                  "pm.test(\"birthPlace saved\", () => pm.expect(d.birthPlace.timezone).to.eql(\"Asia/Kolkata\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update DOB (sign recalculated)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Changing `dob` recalculates `sunSign` and `starSign` automatically.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dob\": \"1995-04-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "Changing `dob` recalculates `sunSign` and `starSign` automatically.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dob\": \"1995-04-10\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Profile updated\",\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"name\": \"Aarav Astro\",\n    \"phoneNumber\": \"+919000000101\",\n    \"dob\": \"1995-04-10T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-04-10T00:00:00.000Z\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"birthTime\": \"06:45\",\n    \"birthTimeKnown\": true,\n    \"birthPlace\": {\n      \"name\": \"Mumbai, Maharashtra, India\",\n      \"latitude\": 19.076,\n      \"longitude\": 72.8777,\n      \"timezone\": \"Asia/Kolkata\"\n    },\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.8777,\n        19.076\n      ]\n    },\n    \"isVerified\": false,\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"score\": null,\n      \"threshold\": null,\n      \"reason\": \"\",\n      \"verifiedAt\": null,\n      \"lastAttemptAt\": null\n    },\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.220Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"sunSign = aries\", () => pm.expect(d.sunSign).to.eql(\"aries\"));",
+                  "pm.test(\"starSign = Aries\", () => pm.expect(d.starSign).to.eql(\"Aries\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Birth time unknown (clears birthTime)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "For an \"I don't know my birth time\" toggle. Clears `birthTime` and sets `birthTimeKnown: false`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthTimeKnown\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "For an \"I don't know my birth time\" toggle. Clears `birthTime` and sets `birthTimeKnown: false`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthTimeKnown\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Profile updated\",\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"name\": \"Aarav Astro\",\n    \"phoneNumber\": \"+919000000101\",\n    \"dob\": \"1995-04-10T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-04-10T00:00:00.000Z\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"birthTime\": null,\n    \"birthTimeKnown\": false,\n    \"birthPlace\": {\n      \"name\": \"Mumbai, Maharashtra, India\",\n      \"latitude\": 19.076,\n      \"longitude\": 72.8777,\n      \"timezone\": \"Asia/Kolkata\"\n    },\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.8777,\n        19.076\n      ]\n    },\n    \"isVerified\": false,\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"score\": null,\n      \"threshold\": null,\n      \"reason\": \"\",\n      \"verifiedAt\": null,\n      \"lastAttemptAt\": null\n    },\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.222Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"birthTime cleared\", () => pm.expect(pm.response.json().data.birthTime).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set birth time again",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Restores the birth time for the next requests.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthTime\": \"06:45\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "Restores the birth time for the next requests.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthTime\": \"06:45\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Profile updated\",\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"name\": \"Aarav Astro\",\n    \"phoneNumber\": \"+919000000101\",\n    \"dob\": \"1995-04-10T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-04-10T00:00:00.000Z\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"birthTime\": \"06:45\",\n    \"birthTimeKnown\": true,\n    \"birthPlace\": {\n      \"name\": \"Mumbai, Maharashtra, India\",\n      \"latitude\": 19.076,\n      \"longitude\": 72.8777,\n      \"timezone\": \"Asia/Kolkata\"\n    },\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.8777,\n        19.076\n      ]\n    },\n    \"isVerified\": false,\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"score\": null,\n      \"threshold\": null,\n      \"reason\": \"\",\n      \"verifiedAt\": null,\n      \"lastAttemptAt\": null\n    },\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.223Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove birth place",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "`null` removes the saved birth place.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthPlace\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "`null` removes the saved birth place.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthPlace\": null\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Profile updated\",\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"name\": \"Aarav Astro\",\n    \"phoneNumber\": \"+919000000101\",\n    \"dob\": \"1995-04-10T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-04-10T00:00:00.000Z\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"birthTime\": \"06:45\",\n    \"birthTimeKnown\": true,\n    \"birthPlace\": null,\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.8777,\n        19.076\n      ]\n    },\n    \"isVerified\": false,\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"score\": null,\n      \"threshold\": null,\n      \"reason\": \"\",\n      \"verifiedAt\": null,\n      \"lastAttemptAt\": null\n    },\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.224Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"birthPlace cleared\", () => pm.expect(pm.response.json().data.birthPlace).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set birth place again",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Restores the birth place.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "Restores the birth place.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Profile updated\",\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"email\": \"aarav.astro@example.com\",\n    \"name\": \"Aarav Astro\",\n    \"phoneNumber\": \"+919000000101\",\n    \"dob\": \"1995-04-10T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-04-10T00:00:00.000Z\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"birthTime\": \"06:45\",\n    \"birthTimeKnown\": true,\n    \"birthPlace\": {\n      \"name\": \"Mumbai, Maharashtra, India\",\n      \"latitude\": 19.076,\n      \"longitude\": 72.8777,\n      \"timezone\": \"Asia/Kolkata\"\n    },\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.8777,\n        19.076\n      ]\n    },\n    \"isVerified\": false,\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"score\": null,\n      \"threshold\": null,\n      \"reason\": \"\",\n      \"verifiedAt\": null,\n      \"lastAttemptAt\": null\n    },\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.226Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR invalid birth time (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "`birthTime` must be 24h `HH:mm`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthTime\": \"25:99\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "`birthTime` must be 24h `HH:mm`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthTime\": \"25:99\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"birthTime must be in 24h HH:mm format, e.g. 14:30\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR birthTimeKnown true without time (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "`birthTimeKnown: true` needs `birthTime` in the same request.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthTimeKnown\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "`birthTimeKnown: true` needs `birthTime` in the same request.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthTimeKnown\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"birthTime is required when birthTimeKnown is true\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR invalid timezone (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "`timezone` must be an IANA name.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Mars/Base\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "`timezone` must be an IANA name.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 19.076,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Mars/Base\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"birthPlace.timezone must be an IANA timezone, e.g. Asia/Kolkata\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR latitude out of range (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Latitude -90..90, longitude -180..180.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 95,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "Latitude -90..90, longitude -180..180.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai, Maharashtra, India\",\n    \"latitude\": 95,\n    \"longitude\": 72.8777,\n    \"timezone\": \"Asia/Kolkata\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"birthPlace latitude/longitude out of range\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR incomplete birth place (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "All four `birthPlace` fields are required.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "All four `birthPlace` fields are required.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"birthPlace\": {\n    \"name\": \"Mumbai\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"birthPlace is missing: latitude, longitude, timezone\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR future DOB (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "DOB cannot be in the future.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dob\": \"2030-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "DOB cannot be in the future.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dob\": \"2030-01-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Date of birth cannot be in the future\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR under 18 (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Users must be 18+.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dob\": \"2012-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "Users must be 18+.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dob\": \"2012-01-01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"You must be at least 18 years old\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR impossible date (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Dates like Feb 30 are rejected.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dob\": \"2001-02-30\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/profile",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "profile"
+                  ]
+                },
+                "description": "Dates like Feb 30 are rejected.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dob\": \"2001-02-30\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Invalid date of birth. Use YYYY-MM-DD\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Astro Match",
+      "item": [
+        {
+          "name": "My astro profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "me"
+              ]
+            },
+            "description": "Signed-in user's astro profile. Use it for the \"Your sign\" section and to prompt users to complete birth details.\n\n**Response `data`:**\n| Field | Description |\n|---|---|\n| `available` | `true` when a sign can be calculated (needs DOB) |\n| `chart.sunSign` | lowercase sign key: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces |\n| `chart.sunSignLabel` | display name, e.g. `\"Aries\"` |\n| `chart.element` | `fire` \\| `earth` \\| `air` \\| `water` |\n| `chart.modality` | `cardinal` \\| `fixed` \\| `mutable` |\n| `birthDetails` | saved `dob`, `birthTime`, `birthTimeKnown`, `birthPlace` |\n| `missing.required` | fields needed for any score (only `dob`) |\n| `missing.optional` | fields that will improve accuracy later (`birthTime`, `birthPlace`) |\n| `completeness` | `incomplete` (no DOB) \\| `basic` (DOB only) \\| `full` (DOB + time + place) |\n\nSuggested UI: show a \"Add birth time & place for a more accurate match\" prompt when `completeness` is `basic`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "me"
+                  ]
+                },
+                "description": "Signed-in user's astro profile. Use it for the \"Your sign\" section and to prompt users to complete birth details.\n\n**Response `data`:**\n| Field | Description |\n|---|---|\n| `available` | `true` when a sign can be calculated (needs DOB) |\n| `chart.sunSign` | lowercase sign key: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces |\n| `chart.sunSignLabel` | display name, e.g. `\"Aries\"` |\n| `chart.element` | `fire` \\| `earth` \\| `air` \\| `water` |\n| `chart.modality` | `cardinal` \\| `fixed` \\| `mutable` |\n| `birthDetails` | saved `dob`, `birthTime`, `birthTimeKnown`, `birthPlace` |\n| `missing.required` | fields needed for any score (only `dob`) |\n| `missing.optional` | fields that will improve accuracy later (`birthTime`, `birthPlace`) |\n| `completeness` | `incomplete` (no DOB) \\| `basic` (DOB only) \\| `full` (DOB + time + place) |\n\nSuggested UI: show a \"Add birth time & place for a more accurate match\" prompt when `completeness` is `basic`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"available\": true,\n    \"chart\": {\n      \"sunSign\": \"aries\",\n      \"sunSignLabel\": \"Aries\",\n      \"element\": \"fire\",\n      \"modality\": \"cardinal\"\n    },\n    \"birthDetails\": {\n      \"dob\": \"1995-04-10T00:00:00.000Z\",\n      \"birthTime\": \"06:45\",\n      \"birthTimeKnown\": true,\n      \"birthPlace\": {\n        \"name\": \"Mumbai, Maharashtra, India\",\n        \"latitude\": 19.076,\n        \"longitude\": 72.8777,\n        \"timezone\": \"Asia/Kolkata\"\n      }\n    },\n    \"missing\": {\n      \"required\": [],\n      \"optional\": []\n    },\n    \"completeness\": \"full\"\n  }\n}"
+            },
+            {
+              "name": "200 OK \u2014 completeness: basic (DOB only)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "me"
+                  ]
+                },
+                "description": "Signed-in user's astro profile. Use it for the \"Your sign\" section and to prompt users to complete birth details.\n\n**Response `data`:**\n| Field | Description |\n|---|---|\n| `available` | `true` when a sign can be calculated (needs DOB) |\n| `chart.sunSign` | lowercase sign key: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces |\n| `chart.sunSignLabel` | display name, e.g. `\"Aries\"` |\n| `chart.element` | `fire` \\| `earth` \\| `air` \\| `water` |\n| `chart.modality` | `cardinal` \\| `fixed` \\| `mutable` |\n| `birthDetails` | saved `dob`, `birthTime`, `birthTimeKnown`, `birthPlace` |\n| `missing.required` | fields needed for any score (only `dob`) |\n| `missing.optional` | fields that will improve accuracy later (`birthTime`, `birthPlace`) |\n| `completeness` | `incomplete` (no DOB) \\| `basic` (DOB only) \\| `full` (DOB + time + place) |\n\nSuggested UI: show a \"Add birth time & place for a more accurate match\" prompt when `completeness` is `basic`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{otherToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"available\": true,\n    \"chart\": {\n      \"sunSign\": \"leo\",\n      \"sunSignLabel\": \"Leo\",\n      \"element\": \"fire\",\n      \"modality\": \"fixed\"\n    },\n    \"birthDetails\": {\n      \"dob\": \"1997-08-05T00:00:00.000Z\",\n      \"birthTime\": null,\n      \"birthTimeKnown\": false,\n      \"birthPlace\": null\n    },\n    \"missing\": {\n      \"required\": [],\n      \"optional\": [\n        \"birthTime\",\n        \"birthPlace\"\n      ]\n    },\n    \"completeness\": \"basic\"\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"available\", () => pm.expect(d.available).to.eql(true));",
+                  "pm.test(\"has sunSign\", () => pm.expect(d.chart.sunSign).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Astro Match with a user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/match/{{otherUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "match",
+                "{{otherUserId}}"
+              ]
+            },
+            "description": "**Main Astro Match API.** Use it for the Astro Match card on a profile (F1\u2013F3) and the compatibility details screen (F4\u2013F5).\n\n`:userId` = the other user's `id`.\n\n**Response `data` when `available: true`:**\n| Field | Description |\n|---|---|\n| `score` | integer 0\u2013100 \u2014 show as `87%`. Same value for both users, always. |\n| `band` | `excellent` (85+) \\| `strong` (70\u201384) \\| `moderate` (50\u201369) \\| `challenging` (<50) \u2014 use for colour/label |\n| `me` / `other.chart` | `sunSign`, `sunSignLabel`, `element`, `modality` for each user |\n| `other.userId`, `other.name` | the other user |\n| `breakdown` | how the score was built: `aspect` (60%), `element` (25%), `modality` (15%), each with its own score |\n| `strengths[]` | `{ key, label }` \u2014 show `label`; `key` is stable if you want your own icons/copy |\n| `challenges[]` | `{ key, label }` \u2014 always at least one item |\n| `explanation` | `null` for now. AI text arrives in a later phase; show nothing or a placeholder when null. |\n| `method`, `algorithmVersion` | `\"sun_sign\"`, `\"1.0\"` \u2014 informational |\n\n**`available: false`** (HTTP 200, not an error) means one user has no DOB. Show an empty state (F8). `missing.me` / `missing.other` say whose data is missing \u2014 if `missing.me` has `dob`, prompt the user to add it.\n\n**Errors:** `400` invalid id or your own id \u00b7 `404` user doesn't exist, is blocked (either way), banned, inactive, or incognito and not matched with you \u00b7 `401` missing/expired token. All errors look like `{ \"message\": \"...\" }`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/match/{{otherUserId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "match",
+                    "{{otherUserId}}"
+                  ]
+                },
+                "description": "**Main Astro Match API.** Use it for the Astro Match card on a profile (F1\u2013F3) and the compatibility details screen (F4\u2013F5).\n\n`:userId` = the other user's `id`.\n\n**Response `data` when `available: true`:**\n| Field | Description |\n|---|---|\n| `score` | integer 0\u2013100 \u2014 show as `87%`. Same value for both users, always. |\n| `band` | `excellent` (85+) \\| `strong` (70\u201384) \\| `moderate` (50\u201369) \\| `challenging` (<50) \u2014 use for colour/label |\n| `me` / `other.chart` | `sunSign`, `sunSignLabel`, `element`, `modality` for each user |\n| `other.userId`, `other.name` | the other user |\n| `breakdown` | how the score was built: `aspect` (60%), `element` (25%), `modality` (15%), each with its own score |\n| `strengths[]` | `{ key, label }` \u2014 show `label`; `key` is stable if you want your own icons/copy |\n| `challenges[]` | `{ key, label }` \u2014 always at least one item |\n| `explanation` | `null` for now. AI text arrives in a later phase; show nothing or a placeholder when null. |\n| `method`, `algorithmVersion` | `\"sun_sign\"`, `\"1.0\"` \u2014 informational |\n\n**`available: false`** (HTTP 200, not an error) means one user has no DOB. Show an empty state (F8). `missing.me` / `missing.other` say whose data is missing \u2014 if `missing.me` has `dob`, prompt the user to add it.\n\n**Errors:** `400` invalid id or your own id \u00b7 `404` user doesn't exist, is blocked (either way), banned, inactive, or incognito and not matched with you \u00b7 `401` missing/expired token. All errors look like `{ \"message\": \"...\" }`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"available\": true,\n    \"score\": 91,\n    \"band\": \"excellent\",\n    \"method\": \"sun_sign\",\n    \"algorithmVersion\": \"1.0\",\n    \"me\": {\n      \"sunSign\": \"aries\",\n      \"sunSignLabel\": \"Aries\",\n      \"element\": \"fire\",\n      \"modality\": \"cardinal\"\n    },\n    \"other\": {\n      \"userId\": \"6afff90303cbde5fee363789\",\n      \"name\": \"Diya Astro\",\n      \"chart\": {\n        \"sunSign\": \"leo\",\n        \"sunSignLabel\": \"Leo\",\n        \"element\": \"fire\",\n        \"modality\": \"fixed\"\n      }\n    },\n    \"breakdown\": {\n      \"aspect\": {\n        \"type\": \"trine\",\n        \"signsApart\": 4,\n        \"score\": 95,\n        \"weight\": 0.6\n      },\n      \"element\": {\n        \"pair\": [\n          \"fire\",\n          \"fire\"\n        ],\n        \"score\": 90,\n        \"weight\": 0.25\n      },\n      \"modality\": {\n        \"pair\": [\n          \"cardinal\",\n          \"fixed\"\n        ],\n        \"score\": 75,\n        \"weight\": 0.15\n      }\n    },\n    \"strengths\": [\n      {\n        \"key\": \"effortless_harmony\",\n        \"label\": \"Things tend to flow easily between you\"\n      },\n      {\n        \"key\": \"shared_values\",\n        \"label\": \"Shared core values and outlook\"\n      },\n      {\n        \"key\": \"loyalty\",\n        \"label\": \"Deep loyalty and commitment\"\n      }\n    ],\n    \"challenges\": [\n      {\n        \"key\": \"routine\",\n        \"label\": \"May settle into routine\"\n      }\n    ],\n    \"explanation\": null\n  }\n}"
+            },
+            {
+              "name": "200 OK \u2014 available: false (other user has no DOB)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/match/6afff9031282d0b3ae115a1e",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "match",
+                    "6afff9031282d0b3ae115a1e"
+                  ]
+                },
+                "description": "**Main Astro Match API.** Use it for the Astro Match card on a profile (F1\u2013F3) and the compatibility details screen (F4\u2013F5).\n\n`:userId` = the other user's `id`.\n\n**Response `data` when `available: true`:**\n| Field | Description |\n|---|---|\n| `score` | integer 0\u2013100 \u2014 show as `87%`. Same value for both users, always. |\n| `band` | `excellent` (85+) \\| `strong` (70\u201384) \\| `moderate` (50\u201369) \\| `challenging` (<50) \u2014 use for colour/label |\n| `me` / `other.chart` | `sunSign`, `sunSignLabel`, `element`, `modality` for each user |\n| `other.userId`, `other.name` | the other user |\n| `breakdown` | how the score was built: `aspect` (60%), `element` (25%), `modality` (15%), each with its own score |\n| `strengths[]` | `{ key, label }` \u2014 show `label`; `key` is stable if you want your own icons/copy |\n| `challenges[]` | `{ key, label }` \u2014 always at least one item |\n| `explanation` | `null` for now. AI text arrives in a later phase; show nothing or a placeholder when null. |\n| `method`, `algorithmVersion` | `\"sun_sign\"`, `\"1.0\"` \u2014 informational |\n\n**`available: false`** (HTTP 200, not an error) means one user has no DOB. Show an empty state (F8). `missing.me` / `missing.other` say whose data is missing \u2014 if `missing.me` has `dob`, prompt the user to add it.\n\n**Errors:** `400` invalid id or your own id \u00b7 `404` user doesn't exist, is blocked (either way), banned, inactive, or incognito and not matched with you \u00b7 `401` missing/expired token. All errors look like `{ \"message\": \"...\" }`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"available\": false,\n    \"reason\": \"missing_birth_data\",\n    \"missing\": {\n      \"me\": [],\n      \"other\": [\n        \"dob\"\n      ]\n    },\n    \"me\": {\n      \"sunSign\": \"aries\",\n      \"sunSignLabel\": \"Aries\",\n      \"element\": \"fire\",\n      \"modality\": \"cardinal\"\n    },\n    \"other\": {\n      \"userId\": \"6afff9031282d0b3ae115a1e\",\n      \"name\": \"No DOB User\",\n      \"chart\": null\n    }\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"available\", () => pm.expect(d.available).to.eql(true));",
+                  "pm.test(\"score 0-100\", () => pm.expect(d.score).to.be.within(0, 100));",
+                  "pm.test(\"strengths + challenges\", () => { pm.expect(d.strengths.length).to.be.above(0); pm.expect(d.challenges.length).to.be.above(0); });",
+                  "pm.collectionVariables.set(\"lastScore\", d.score);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same match from the other side",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/match/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "match",
+                "{{userId}}"
+              ]
+            },
+            "description": "User B viewing user A. The score is always identical in both directions.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/match/{{userId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "match",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "User B viewing user A. The score is always identical in both directions.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{otherToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"available\": true,\n    \"score\": 91,\n    \"band\": \"excellent\",\n    \"method\": \"sun_sign\",\n    \"algorithmVersion\": \"1.0\",\n    \"me\": {\n      \"sunSign\": \"leo\",\n      \"sunSignLabel\": \"Leo\",\n      \"element\": \"fire\",\n      \"modality\": \"fixed\"\n    },\n    \"other\": {\n      \"userId\": \"6afff90303cbde5fee36377f\",\n      \"name\": \"Aarav Astro\",\n      \"chart\": {\n        \"sunSign\": \"aries\",\n        \"sunSignLabel\": \"Aries\",\n        \"element\": \"fire\",\n        \"modality\": \"cardinal\"\n      }\n    },\n    \"breakdown\": {\n      \"aspect\": {\n        \"type\": \"trine\",\n        \"signsApart\": 4,\n        \"score\": 95,\n        \"weight\": 0.6\n      },\n      \"element\": {\n        \"pair\": [\n          \"fire\",\n          \"fire\"\n        ],\n        \"score\": 90,\n        \"weight\": 0.25\n      },\n      \"modality\": {\n        \"pair\": [\n          \"cardinal\",\n          \"fixed\"\n        ],\n        \"score\": 75,\n        \"weight\": 0.15\n      }\n    },\n    \"strengths\": [\n      {\n        \"key\": \"effortless_harmony\",\n        \"label\": \"Things tend to flow easily between you\"\n      },\n      {\n        \"key\": \"shared_values\",\n        \"label\": \"Shared core values and outlook\"\n      },\n      {\n        \"key\": \"loyalty\",\n        \"label\": \"Deep loyalty and commitment\"\n      }\n    ],\n    \"challenges\": [\n      {\n        \"key\": \"routine\",\n        \"label\": \"May settle into routine\"\n      }\n    ],\n    \"explanation\": null\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"same score both ways\", () => pm.expect(pm.response.json().data.score).to.eql(Number(pm.collectionVariables.get(\"lastScore\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign pair compatibility",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/compatibility?signA=aries&signB=leo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "compatibility"
+              ],
+              "query": [
+                {
+                  "key": "signA",
+                  "value": "aries"
+                },
+                {
+                  "key": "signB",
+                  "value": "leo"
+                }
+              ]
+            },
+            "description": "Score for any two signs, without users. Same scoring as the match API. Useful for a \"check sign compatibility\" screen or for QA.\n\nQuery: `signA`, `signB` \u2014 lowercase: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces.\n\nResponse `data` has `score`, `band`, `signs`, `breakdown`, `strengths`, `challenges`.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/compatibility?signA=aries&signB=leo",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "compatibility"
+                  ],
+                  "query": [
+                    {
+                      "key": "signA",
+                      "value": "aries"
+                    },
+                    {
+                      "key": "signB",
+                      "value": "leo"
+                    }
+                  ]
+                },
+                "description": "Score for any two signs, without users. Same scoring as the match API. Useful for a \"check sign compatibility\" screen or for QA.\n\nQuery: `signA`, `signB` \u2014 lowercase: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces.\n\nResponse `data` has `score`, `band`, `signs`, `breakdown`, `strengths`, `challenges`.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"score\": 91,\n    \"band\": \"excellent\",\n    \"algorithmVersion\": \"1.0\",\n    \"method\": \"sun_sign\",\n    \"signs\": [\n      \"aries\",\n      \"leo\"\n    ],\n    \"breakdown\": {\n      \"aspect\": {\n        \"type\": \"trine\",\n        \"signsApart\": 4,\n        \"score\": 95,\n        \"weight\": 0.6\n      },\n      \"element\": {\n        \"pair\": [\n          \"fire\",\n          \"fire\"\n        ],\n        \"score\": 90,\n        \"weight\": 0.25\n      },\n      \"modality\": {\n        \"pair\": [\n          \"cardinal\",\n          \"fixed\"\n        ],\n        \"score\": 75,\n        \"weight\": 0.15\n      }\n    },\n    \"strengths\": [\n      {\n        \"key\": \"effortless_harmony\",\n        \"label\": \"Things tend to flow easily between you\"\n      },\n      {\n        \"key\": \"shared_values\",\n        \"label\": \"Shared core values and outlook\"\n      },\n      {\n        \"key\": \"loyalty\",\n        \"label\": \"Deep loyalty and commitment\"\n      }\n    ],\n    \"challenges\": [\n      {\n        \"key\": \"routine\",\n        \"label\": \"May settle into routine\"\n      }\n    ]\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"aries+leo = 91\", () => pm.expect(pm.response.json().data.score).to.eql(91));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign pair \u2014 challenging example",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/compatibility?signA=aries&signB=cancer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "compatibility"
+              ],
+              "query": [
+                {
+                  "key": "signA",
+                  "value": "aries"
+                },
+                {
+                  "key": "signB",
+                  "value": "cancer"
+                }
+              ]
+            },
+            "description": "A low-scoring pair, so you can check the UI for the `challenging` band.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/compatibility?signA=aries&signB=cancer",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "compatibility"
+                  ],
+                  "query": [
+                    {
+                      "key": "signA",
+                      "value": "aries"
+                    },
+                    {
+                      "key": "signB",
+                      "value": "cancer"
+                    }
+                  ]
+                },
+                "description": "A low-scoring pair, so you can check the UI for the `challenging` band.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"score\": 43,\n    \"band\": \"challenging\",\n    \"algorithmVersion\": \"1.0\",\n    \"method\": \"sun_sign\",\n    \"signs\": [\n      \"aries\",\n      \"cancer\"\n    ],\n    \"breakdown\": {\n      \"aspect\": {\n        \"type\": \"square\",\n        \"signsApart\": 3,\n        \"score\": 42,\n        \"weight\": 0.6\n      },\n      \"element\": {\n        \"pair\": [\n          \"fire\",\n          \"water\"\n        ],\n        \"score\": 40,\n        \"weight\": 0.25\n      },\n      \"modality\": {\n        \"pair\": [\n          \"cardinal\",\n          \"cardinal\"\n        ],\n        \"score\": 55,\n        \"weight\": 0.15\n      }\n    },\n    \"strengths\": [\n      {\n        \"key\": \"growth\",\n        \"label\": \"You help each other grow\"\n      },\n      {\n        \"key\": \"shared_ambition\",\n        \"label\": \"Shared drive to start new things\"\n      }\n    ],\n    \"challenges\": [\n      {\n        \"key\": \"friction\",\n        \"label\": \"Friction when you disagree\"\n      },\n      {\n        \"key\": \"impulse_vs_emotion\",\n        \"label\": \"Impulse versus emotional depth\"\n      },\n      {\n        \"key\": \"power_struggles\",\n        \"label\": \"Both like to take the lead\"\n      }\n    ]\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR match with yourself (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/match/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "match",
+                "{{userId}}"
+              ]
+            },
+            "description": "Your own id is rejected.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/match/{{userId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "match",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "Your own id is rejected.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Cannot calculate Astro Match with yourself\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR invalid user id (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/match/not-an-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "match",
+                "not-an-id"
+              ]
+            },
+            "description": "Malformed id.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/match/not-an-id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "match",
+                    "not-an-id"
+                  ]
+                },
+                "description": "Malformed id.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Invalid userId\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR user not found (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/match/000000000000000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "match",
+                "000000000000000000000000"
+              ]
+            },
+            "description": "Also returned for blocked, banned, inactive, or hidden users, so you can't tell which.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/match/000000000000000000000000",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "match",
+                    "000000000000000000000000"
+                  ]
+                },
+                "description": "Also returned for blocked, banned, inactive, or hidden users, so you can't tell which.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"User not found\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR invalid sign (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/compatibility?signA=aries&signB=dragon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "compatibility"
+              ],
+              "query": [
+                {
+                  "key": "signA",
+                  "value": "aries"
+                },
+                {
+                  "key": "signB",
+                  "value": "dragon"
+                }
+              ]
+            },
+            "description": "Unknown sign name.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/compatibility?signA=aries&signB=dragon",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "compatibility"
+                  ],
+                  "query": [
+                    {
+                      "key": "signA",
+                      "value": "aries"
+                    },
+                    {
+                      "key": "signB",
+                      "value": "dragon"
+                    }
+                  ]
+                },
+                "description": "Unknown sign name.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"signA and signB must be one of: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR no token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/astro/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "astro",
+                "me"
+              ]
+            },
+            "description": "All `/astro` routes need `Authorization: Bearer <accessToken>`.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/astro/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "astro",
+                    "me"
+                  ]
+                },
+                "description": "All `/astro` routes need `Authorization: Bearer <accessToken>`.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"message\": \"Invalid or expired access token\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Privacy check",
+      "item": [
+        {
+          "name": "Other user's profile hides birth time/place",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "User B viewing user A's public profile: `birthTime`, `birthTimeKnown` and `birthPlace` are not included. `starSign` / `sunSign` are public.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/users/{{userId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "users",
+                    "{{userId}}"
+                  ]
+                },
+                "description": "User B viewing user A's public profile: `birthTime`, `birthTimeKnown` and `birthPlace` are not included. `starSign` / `sunSign` are public.",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{otherToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"id\": \"6afff90303cbde5fee36377f\",\n    \"_id\": \"6afff90303cbde5fee36377f\",\n    \"publicUserId\": \"USR-00001\",\n    \"name\": \"Aarav Astro\",\n    \"gender\": \"male\",\n    \"interestedIn\": \"female\",\n    \"profile\": \"Astro Match test user A\",\n    \"photos\": [],\n    \"photoUrls\": [],\n    \"bio\": \"Astro Match test user A\",\n    \"interests\": [],\n    \"hometown\": \"\",\n    \"work\": \"\",\n    \"education\": \"\",\n    \"educationLevel\": \"\",\n    \"height\": \"\",\n    \"exercise\": \"\",\n    \"starSign\": \"Aries\",\n    \"sunSign\": \"aries\",\n    \"drinking\": \"\",\n    \"smoking\": \"\",\n    \"lookingFor\": \"\",\n    \"kids\": \"\",\n    \"haveKids\": \"\",\n    \"religion\": \"\",\n    \"politics\": \"\",\n    \"pronouns\": \"\",\n    \"languages\": [],\n    \"courses\": [],\n    \"qualities\": [],\n    \"openingMoves\": [],\n    \"relationshipStatus\": \"single\",\n    \"isVerified\": false,\n    \"isOnline\": true,\n    \"lastActive\": \"2026-11-20T07:38:43.226Z\",\n    \"createdAt\": \"2026-11-20T07:38:43.042Z\",\n    \"active\": true,\n    \"isHidden\": false,\n    \"isIncognito\": false,\n    \"age\": 31,\n    \"dob\": \"1995-11-20T00:00:00.000Z\",\n    \"dateOfBirth\": \"1995-11-20T00:00:00.000Z\",\n    \"location\": {\n      \"type\": \"Point\",\n      \"coordinates\": [\n        72.88,\n        19.08\n      ]\n    },\n    \"selfieVerification\": {\n      \"status\": \"not_started\",\n      \"verifiedAt\": null\n    }\n  }\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test(\"no birthTime\", () => pm.expect(d).to.not.have.property(\"birthTime\"));",
+                  "pm.test(\"no birthPlace\", () => pm.expect(d).to.not.have.property(\"birthPlace\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

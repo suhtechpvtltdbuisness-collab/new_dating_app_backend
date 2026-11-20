@@ -1,4 +1,5 @@
 import { AuthError } from "../errors/AuthError";
+import { validateDob } from "./astro.validation";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../utils/phone";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,9 +68,8 @@ export function validateRegisterInput(
     );
   }
 
-  if (Number.isNaN(new Date(dob).getTime())) {
-    throw new AuthError("Invalid date of birth", 400);
-  }
+  // Rejects invalid, future and under-18 dates before any database work.
+  validateDob(dob);
 
   const normalizedPhone = normalizePhoneNumber(phoneNumber);
   if (!isValidPhoneNumber(normalizedPhone)) {

@@ -13,7 +13,7 @@ import {
   stringListQuery,
 } from "../utils/context";
 
-function discoveryQuery(req: Request) {
+export function discoveryQuery(req: Request) {
   return {
     page: numericQuery(req, "page"),
     limit: numericQuery(req, "limit"),

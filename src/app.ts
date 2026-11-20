@@ -8,6 +8,7 @@ import { connectDatabase } from "./config/db";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import adminRouter from "./routes/admin.routes";
+import astroRouter from "./routes/astro.routes";
 import authRouter from "./routes/auth.routes";
 import chatHistoryRouter from "./routes/chat-history.routes";
 import chatUsersRouter from "./routes/chat-users.routes";
@@ -140,6 +141,7 @@ app.use(
     "/blogs",
     "/site-content",
     "/payments",
+    "/astro",
   ],
   async (_req, _res, next) => {
     try {
@@ -168,6 +170,7 @@ app.use("/plans", planRouter);
 app.use("/blogs", blogRouter);
 app.use("/site-content", siteContentRouter);
 app.use("/payments", paymentRouter);
+app.use("/astro", astroRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

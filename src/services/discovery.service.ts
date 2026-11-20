@@ -68,7 +68,7 @@ function clampLimit(limit?: number): number {
   return Math.min(Math.max(1, Math.floor(value)), MAX_LIMIT);
 }
 
-function clampPage(page?: number): number {
+export function clampPage(page?: number): number {
   const value = Number(page);
   if (!Number.isFinite(value) || value < 1) return 1;
   return Math.floor(value);
@@ -97,7 +97,8 @@ async function excludedIds(userId: string): Promise<Types.ObjectId[]> {
   return swipes.map((swipe) => swipe.targetUserId as Types.ObjectId);
 }
 
-async function baseFilter(userId: string, query: DiscoveryQuery) {
+/** Shared discovery rules (who may appear + preference filters). Also used by Astro Best Matches. */
+export async function baseFilter(userId: string, query: DiscoveryQuery) {
   const currentUser = await currentUserOrThrow(userId);
   const prefs = (currentUser.preferences ?? {}) as Record<string, any>;
 

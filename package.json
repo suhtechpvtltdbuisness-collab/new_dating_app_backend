@@ -7,7 +7,9 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test:astro": "ts-node --transpile-only src/tests/astro.test.ts",
+    "backfill:astro": "ts-node --transpile-only src/scripts/backfillAstro.ts"
   },
   "keywords": [
     "express",

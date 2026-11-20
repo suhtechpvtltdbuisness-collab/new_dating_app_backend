@@ -44,6 +44,25 @@ const userSchema = new Schema(
     },
     name: { type: String, required: true, trim: true },
     dob: { type: Date, required: true },
+    // Astro Match birth details (B2, B3). Private: never shown to other users.
+    birthTime: { type: String, default: null }, // "HH:mm", 24h, local time at birthPlace
+    birthTimeKnown: { type: Boolean, default: false },
+    birthPlace: {
+      type: new Schema(
+        {
+          name: { type: String, trim: true, required: true },
+          latitude: { type: Number, required: true, min: -90, max: 90 },
+          longitude: { type: Number, required: true, min: -180, max: 180 },
+          timezone: { type: String, trim: true, required: true }, // IANA, e.g. Asia/Kolkata
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
+    // Derived from dob by the server (B5). Indexed for "Best Astro Matches" (B8).
+    astro: {
+      sunSign: { type: String, index: true },
+    },
     gender: { type: String, required: true, trim: true },
     interestedIn: { type: String, required: true, trim: true },
     profile: { type: String, required: true, trim: true },

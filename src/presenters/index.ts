@@ -100,6 +100,10 @@ export function presentUser(user: any) {
     height: user.height ?? "",
     exercise: user.exercise ?? "",
     starSign: user.starSign ?? "",
+    birthTime: user.birthTime ?? null,
+    birthTimeKnown: Boolean(user.birthTimeKnown),
+    birthPlace: user.birthPlace ?? null,
+    sunSign: user.astro?.sunSign ?? null,
     drinking: user.drinking ?? "",
     smoking: user.smoking ?? "",
     lookingFor: user.lookingFor ?? "",
@@ -170,6 +174,9 @@ export function presentPublicUser(user: any) {
     dob: _dob,
     dateOfBirth: _dateOfBirth,
     location: _location,
+    birthTime: _birthTime,
+    birthTimeKnown: _birthTimeKnown,
+    birthPlace: _birthPlace,
     selfieVerification,
     ...rest
   } = full;

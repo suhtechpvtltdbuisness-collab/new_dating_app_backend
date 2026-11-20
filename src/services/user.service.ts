@@ -15,6 +15,8 @@ import {
   revokeRefreshToken,
 } from "../repository/user.repository";
 import { presentUser } from "../presenters";
+import { displaySign, sunSignFromDate } from "./astro/zodiac";
+import { validateDob } from "../validation/astro.validation";
 import { AuthError } from "../errors/AuthError";
 import { sha256 } from "../utils/hash";
 import {
@@ -112,10 +114,15 @@ export async function registerWithEmail(
     ? await bcrypt.hash(input.password, 10)
     : undefined;
 
+  const dob = validateDob(input.dob);
+  const sunSign = sunSignFromDate(dob);
+
   const user = await createUser({
     phoneNumber: input.phoneNumber,
     name: input.name,
-    dob: new Date(input.dob),
+    dob,
+    starSign: displaySign(sunSign),
+    astro: { sunSign },
     gender: input.gender,
     interestedIn: input.interestedIn,
     profile: input.profile,

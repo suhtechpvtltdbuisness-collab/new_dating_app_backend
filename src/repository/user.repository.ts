@@ -25,6 +25,8 @@ export interface CreateUserInput {
   password?: string;
   googleId?: string;
   authProvider?: "email" | "google";
+  starSign?: string;
+  astro?: { sunSign: string };
 }
 
 export function findUserByGoogleId(googleId: string) {

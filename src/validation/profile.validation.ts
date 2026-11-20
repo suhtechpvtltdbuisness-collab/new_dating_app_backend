@@ -1,4 +1,9 @@
 import { AuthError } from "../errors/AuthError";
+import {
+  dobDerivedFields,
+  validateBirthDetails,
+  validateDob,
+} from "./astro.validation";
 
 const STRING_FIELDS = [
   "name",
@@ -126,12 +131,14 @@ export function validateUpdateProfileInput(
 
   const dob = payload.dob ?? payload.dateOfBirth;
   if (dob !== undefined) {
-    const parsed = new Date(String(dob));
-    if (Number.isNaN(parsed.getTime())) {
-      throw new AuthError("Invalid date of birth", 400);
-    }
-    updates.dob = parsed;
+    // Also sets astro.sunSign and starSign so they always agree with DOB.
+    Object.assign(updates, dobDerivedFields(validateDob(dob)));
+  } else if (updates.starSign !== undefined) {
+    // starSign is derived from DOB; ignore a hand-picked value that could contradict it.
+    delete updates.starSign;
   }
+
+  Object.assign(updates, validateBirthDetails(payload));
 
   const coordinates =
     (payload.location as { coordinates?: unknown } | undefined)?.coordinates ??
